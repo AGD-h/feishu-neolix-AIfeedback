@@ -17,3 +17,4 @@ Thumbs.db
 # 数据输出（大文件不入库，需要共享时走飞书云盘）
 data/output/
 *.log
+logs/
