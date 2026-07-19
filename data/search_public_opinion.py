@@ -91,7 +91,7 @@ def get_project_root() -> Path:
 
 def load_serpapi_key(project_root: Path) -> str | None:
     load_dotenv(project_root / ".env")
-    serpapi_key = os.getenv("SERPAPI_KEY")
+    serpapi_key = os.getenv("SERPAPI_KEY", "").strip()
     if not serpapi_key:
         print("未找到 SERPAPI_KEY。")
         print("请先到 https://serpapi.com 注册账号，获取 API Key。")

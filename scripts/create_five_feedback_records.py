@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
 RECORDS = [
     {
-        "channel": "车身扫码",
-        "user_tier": "校园用户",
+        "channel": "scan_qr",
+        "user_tier": "收件人",
         "vehicle_id": "NX-TEST-101",
         "city": "北京",
         "content_raw": "用户反馈：车辆在校园东门斑马线附近突然急停，后方骑行学生差点追尾，担心存在行人安全风险，请立即排查感知识别和刹停策略。",
@@ -21,8 +21,8 @@ RECORDS = [
         "contact_allowed": "是",
     },
     {
-        "channel": "客服电话",
-        "user_tier": "商户",
+        "channel": "hotline",
+        "user_tier": "RaaS商户",
         "vehicle_id": "NX-TEST-102",
         "city": "上海",
         "content_raw": "商户反馈：无人车原定 18:30 到达，但实际晚到 25 分钟，导致晚高峰订单积压，希望能提前预警并优化调度。",
@@ -32,8 +32,8 @@ RECORDS = [
         "contact_allowed": "是",
     },
     {
-        "channel": "微信群",
-        "user_tier": "校园用户",
+        "channel": "wechat_group",
+        "user_tier": "收件人",
         "vehicle_id": "NX-TEST-103",
         "city": "广州",
         "content_raw": "用户反馈：到达取货点后不知道如何打开货舱，车身屏幕提示不明显，建议增加更清晰的取货步骤引导。",
@@ -43,8 +43,8 @@ RECORDS = [
         "contact_allowed": "是",
     },
     {
-        "channel": "车端告警",
-        "user_tier": "运维人员",
+        "channel": "telemetry",
+        "user_tier": "快递员",
         "vehicle_id": "NX-TEST-104",
         "city": "深圳",
         "content_raw": "车端告警：车辆连续 3 次上报定位漂移，路线偏离预设配送路径，建议运维人员检查定位模块和地图匹配状态。",
@@ -54,8 +54,8 @@ RECORDS = [
         "contact_allowed": "否",
     },
     {
-        "channel": "滴滴评价",
-        "user_tier": "普通用户",
+        "channel": "didi_review",
+        "user_tier": "收件人",
         "vehicle_id": "NX-TEST-105",
         "city": "杭州",
         "content_raw": "用户评价：配送整体顺利，但客服电话等待时间较长，问题解决前重复转接了两次，希望提升客服响应效率。",

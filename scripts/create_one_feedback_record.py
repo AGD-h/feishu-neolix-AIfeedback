@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 
 TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
 RECORD_FIELDS = {
-    "channel": "车身扫码",
-    "user_tier": "校园用户",
+    "channel": "scan_qr",
+    "user_tier": "收件人",
     "vehicle_id": "NX-TEST-001",
     "city": "北京",
     "content_raw": "测试反馈：车辆在校园东门斑马线附近急停，用户担心存在行人安全风险，请尽快排查车辆感知与刹停策略。",

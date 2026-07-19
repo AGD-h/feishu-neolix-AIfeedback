@@ -52,12 +52,16 @@ def main() -> None:
         print("请检查网络连接、代理设置，或稍后重试。")
         return
 
+    print(f"HTTP 状态码：{response.status_code}")
+    print(f"响应头：{response.headers}")
+    
     try:
         result = response.json()
+        print(f"完整响应：{result}")
     except ValueError:
         print("鉴权失败")
         print("原因：飞书返回内容不是合法 JSON。")
-        print(f"HTTP 状态码：{response.status_code}")
+        print(f"响应内容：{response.text}")
         return
 
     code = result.get("code")
@@ -74,6 +78,11 @@ def main() -> None:
     print("鉴权失败")
     print(f"飞书返回的 code：{code}")
     print(f"飞书返回的 msg：{msg}")
+    print("\n可能的原因：")
+    print("- App ID 或 App Secret 不正确")
+    print("- 应用未正确发布")
+    print("- 应用类型不支持 tenant_access_token 接口")
+    print("- 需要在飞书开放平台配置权限")
 
 
 if __name__ == "__main__":

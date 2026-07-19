@@ -147,7 +147,12 @@ def main():
     for _ in range(TOTAL):
         pri = weighted_choice(PRIORITY_WEIGHTS)
         tier, cat, texts = random.choice(by_priority[pri])
-        content = random.choice(texts).replace("{n}", str(random.randint(5, 40)))
+        # 模板中的 {n} 在时间语境下限制为 5-23（小时），其他语境 5-40
+        raw = random.choice(texts)
+        if "点" in raw and "{n}" in raw:
+            content = raw.replace("{n}", str(random.randint(5, 23)))
+        else:
+            content = raw.replace("{n}", str(random.randint(5, 40)))
 
         created = random_time_in_days(DAYS)
         datekey = created.strftime("%Y%m%d")

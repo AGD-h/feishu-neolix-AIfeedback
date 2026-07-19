@@ -16,7 +16,7 @@
 
 | 目录 | 负责人 | 内容 |
 |------|--------|------|
-| `data/` | 1号 | `gen_mock_data.py` 仿真数据集生成；`collect_social.py` 舆情采集 |
+| `data/` | 1号 | `gen_mock_data.py` 仿真数据集生成；`search_public_opinion.py` 舆情采集 |
 | `h5/` | 1号 | 一车一码扫码反馈页（可选，MVP 阶段用飞书表单替代，无需写码） |
 | `report/` | 3号 | `weekly_report.py` 聚类周报生成 |
 | `docs/` | 3号 | 文档归档 |
@@ -28,7 +28,7 @@
 1. Python 3.11+，代码风格简单直接，写成可独立运行的脚本，不搞类封装和过度设计——使用者是编程新手，代码要让他们能读懂，关键步骤加中文注释。
 2. 新增依赖必须同步写入根目录 `requirements.txt`，且优先用已有依赖（requests、python-dotenv、openai、pandas）。
 3. 所有密钥从 `.env` 读取（用 python-dotenv），**绝不硬编码在代码里，绝不提交 .env**。新增配置项时同步更新 `.env.example`（只写变量名，不写真实值）。
-4. 调 DeepSeek 用 openai SDK 兼容方式：`base_url="https://api.deepseek.com"`，模型名 `deepseek-chat`，API Key 从环境变量 `DEEPSEEK_API_KEY` 读取。
+4. 调 DeepSeek 用 openai SDK 兼容方式：`base_url="https://api.deepseek.com/v1"`，模型名 `deepseek-chat`，API Key 从环境变量 `DEEPSEEK_API_KEY` 读取。
 5. 调飞书开放平台 API（写多维表格、发消息）用 requests 直接调 REST 接口，tenant_access_token 用 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 换取。
 6. 生成的数据文件输出到 `data/output/`（已被 git 忽略）。
 
@@ -51,6 +51,10 @@
 | created_at / closed_at | 日期时间 | ISO 格式，精确到分钟，closed_at 可为空 |
 | assigned_to | 文本 | 处理人姓名 |
 | csat_score | 数字 | 1–5，可为空 |
+| contact_name | 文本 | 联系人姓名，可为空 |
+| contact_phone | 文本 | 联系人电话，可为空 |
+| contact_allowed | 单选 | 是 / 否，可为空 |
+| location_detail | 文本 | 位置详情，可为空 |
 
 优先级含义：P0=安全事故/监管介入（5分钟响应）；P1=运营中断如车辆趴窝（30分钟）；P2=体验问题如取件失败（1小时）；P3=建议咨询（24小时）。
 
@@ -65,7 +69,7 @@
 - priority 分布合理：P0 极少（约2%）、P1 约10%、P2 约40%、P3 约48%
 - 同时输出一份 `data/output/分布说明.md`，说明构造依据
 
-### data/collect_social.py（舆情采集，增强阶段）
+### data/search_public_opinion.py（舆情采集，增强阶段）
 
 - 只采公开网页内容、小规模（演示用，单次不超过 100 条）、加延时、遵守 robots.txt
 - 采到的原文经 DeepSeek 清洗成 Schema 格式后输出 CSV 或直接写入多维表格
@@ -73,9 +77,14 @@
 
 ### report/weekly_report.py（聚类周报，增强阶段）
 
+架构：**交叉聚合** — DeepSeek 自动化聚类 + 飞书 AI 问数交互式深挖，两者互补。
+
 - 从飞书多维表格读取近 7 天工单（表 ID 从 .env 的 `BITABLE_APP_TOKEN` / `BITABLE_TABLE_ID` 读取）
-- 用 DeepSeek 聚类高频问题，生成包含「TOP 问题、趋势、产品改进建议」的 Markdown 周报
-- 通过飞书 API 推送到团队群（或先输出本地文件）
+- 用 DeepSeek 聚类高频问题，生成「TOP 问题、趋势信号、产品改进建议」
+- **同时生成 5 个飞书 AI 问数推荐问题**（归因分析、趋势预测、关联分析、细分对比、异常检测），引导用户在飞书多维表格中点击 AI 图标进行交互式深挖
+- 基础统计（分类/优先级/渠道分布）不在此脚本中重复生成，由飞书多维表格仪表盘直接提供
+- 通过飞书 API 推送到团队群，消息中包含多维表格链接（用户可点击直接打开 AI 问数）
+- 依赖：`BITABLE_URL`（多维表格完整链接，用于引导 AI 问数）
 
 ## 六、禁止事项
 

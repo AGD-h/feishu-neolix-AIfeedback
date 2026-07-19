@@ -18,3 +18,8 @@ Thumbs.db
 data/output/
 *.log
 logs/
+
+# AI 助手本地 skill 缓存（仅保留 .trae/）
+.qoder/
+.junie/
+.agents/
