@@ -23,3 +23,13 @@ logs/
 .qoder/
 .junie/
 .agents/
+
+# 调试脚本（开发临时文件）
+scripts/debug_*.py
+scripts/test_*.py
+
+# 测试图片（开发临时文件）
+test_*.png
+
+# 周报输出（生成产物，不入库）
+report/output/
