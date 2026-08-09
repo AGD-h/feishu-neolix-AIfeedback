@@ -15,7 +15,25 @@ export default function ResultPage({ result, qrData, onReset, categoryEmoji, pri
   const emoji = categoryEmoji[result.category] || '📋';
 
   const copyTicketId = () => {
-    navigator.clipboard.writeText(result.ticket_id).catch(() => {});
+    navigator.clipboard?.writeText(result.ticket_id).catch(() => {});
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: '新石器无人车反馈工单',
+      text: `反馈已提交，工单编号 ${result.ticket_id}，优先级 ${result.priority}`,
+      url: window.location.href,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+    } catch {
+      /* 用户取消或系统拒绝，静默降级 */
+    }
+    const text = `${shareData.title}\n${shareData.text}\n${shareData.url}`;
+    navigator.clipboard?.writeText(text).catch(() => {});
   };
 
   return (
@@ -171,11 +189,21 @@ export default function ResultPage({ result, qrData, onReset, categoryEmoji, pri
           <span>返回首页</span>
         </button>
         <div className="flex gap-3">
-          <button className="flex-1 bg-white text-gray-600 font-medium py-3 rounded-xl border border-gray-200 flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform text-sm">
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label="分享工单"
+            className="flex-1 bg-white text-gray-600 font-medium py-3.5 rounded-xl border border-gray-200 flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform text-sm touch-target"
+          >
             <Share2 className="w-4 h-4" />
             <span>分享</span>
           </button>
-          <button className="flex-1 bg-white text-gray-600 font-medium py-3 rounded-xl border border-gray-200 flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform text-sm">
+          <button
+            type="button"
+            onClick={copyTicketId}
+            aria-label="复制工单编号"
+            className="flex-1 bg-white text-gray-600 font-medium py-3.5 rounded-xl border border-gray-200 flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform text-sm touch-target"
+          >
             <Copy className="w-4 h-4" />
             <span>复制工单号</span>
           </button>

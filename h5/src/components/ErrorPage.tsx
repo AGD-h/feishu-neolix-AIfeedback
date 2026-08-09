@@ -9,12 +9,13 @@ interface ErrorPageProps {
   onBack: () => void;
 }
 
-const ADMIN_PHONE = '400-xxx-xxxx';
-const ADMIN_WECHAT = 'Neolix-Support';
+const ADMIN_PHONE = import.meta.env.VITE_ADMIN_PHONE || '';
+const ADMIN_WECHAT = import.meta.env.VITE_ADMIN_WECHAT || '';
+const HAS_ADMIN_CONTACT = ADMIN_PHONE || ADMIN_WECHAT;
 
 export default function ErrorPage({ message, failCount, onRetry, onBack }: ErrorPageProps) {
   const [copied, setCopied] = useState<string | null>(null);
-  const showAdminHint = failCount >= 3;
+  const showAdminHint = failCount >= 3 && HAS_ADMIN_CONTACT;
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard?.writeText(text).then(() => {
@@ -109,34 +110,42 @@ export default function ErrorPage({ message, failCount, onRetry, onBack }: Error
                   已连续失败 {failCount} 次，可能是网络或服务器问题，您可以直接联系管理员处理：
                 </p>
                 <div className="space-y-2">
-                  <button
-                    onClick={() => handleCopy(ADMIN_PHONE, 'phone')}
-                    className="w-full flex items-center justify-between bg-white rounded-lg px-3 py-2.5 border border-red-100 active:bg-red-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-red-500" />
-                      <span className="text-sm text-gray-700 font-medium">{ADMIN_PHONE}</span>
-                    </div>
-                    {copied === 'phone' ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5 text-gray-400" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleCopy(ADMIN_WECHAT, 'wechat')}
-                    className="w-full flex items-center justify-between bg-white rounded-lg px-3 py-2.5 border border-red-100 active:bg-red-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 text-green-500 text-center leading-4 text-sm">💬</span>
-                      <span className="text-sm text-gray-700 font-medium">微信: {ADMIN_WECHAT}</span>
-                    </div>
-                    {copied === 'wechat' ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5 text-gray-400" />
-                    )}
-                  </button>
+                  {ADMIN_PHONE && (
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(ADMIN_PHONE, 'phone')}
+                      className="w-full flex items-center justify-between bg-white rounded-lg px-3 py-2.5 border border-red-100 active:bg-red-50 transition-colors"
+                      aria-label={`复制客服电话 ${ADMIN_PHONE}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-red-500" />
+                        <span className="text-sm text-gray-700 font-medium">{ADMIN_PHONE}</span>
+                      </div>
+                      {copied === 'phone' ? (
+                        <Check className="w-4 h-4 text-green-500" aria-hidden="true" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-gray-400" aria-hidden="true" />
+                      )}
+                    </button>
+                  )}
+                  {ADMIN_WECHAT && (
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(ADMIN_WECHAT, 'wechat')}
+                      className="w-full flex items-center justify-between bg-white rounded-lg px-3 py-2.5 border border-red-100 active:bg-red-50 transition-colors"
+                      aria-label={`复制客服微信号 ${ADMIN_WECHAT}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 text-green-500 text-center leading-4 text-sm" aria-hidden="true">💬</span>
+                        <span className="text-sm text-gray-700 font-medium">微信: {ADMIN_WECHAT}</span>
+                      </div>
+                      {copied === 'wechat' ? (
+                        <Check className="w-4 h-4 text-green-500" aria-hidden="true" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-gray-400" aria-hidden="true" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

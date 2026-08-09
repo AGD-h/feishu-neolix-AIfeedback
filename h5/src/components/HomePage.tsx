@@ -68,9 +68,9 @@ export default function HomePage({ qrData, onStart }: HomePageProps) {
         className="space-y-3 mb-8"
       >
         {[
-          { icon: <MessageSquare className="w-5 h-5" />, title: 'AI智能分析', desc: '自动识别问题类型，无需手动选择', color: 'from-blue-500 to-blue-600' },
-          { icon: <Clock className="w-5 h-5" />, title: '快速响应', desc: '紧急问题5分钟内到达负责人', color: 'from-orange-500 to-orange-600' },
-          { icon: <Shield className="w-5 h-5" />, title: '全程追踪', desc: '工单编号实时查询处理进度', color: 'from-green-500 to-green-600' },
+          { icon: <MessageSquare className="w-5 h-5" />, title: 'AI智能分析', desc: '自动识别问题类型，无需手动选择', color: 'from-neolix-400 to-neolix-500' },
+          { icon: <Clock className="w-5 h-5" />, title: '快速响应', desc: '紧急问题5分钟内到达负责人', color: 'from-neolix-500 to-neolix-600' },
+          { icon: <Shield className="w-5 h-5" />, title: '全程追踪', desc: '工单编号实时查询处理进度', color: 'from-neolix-600 to-neolix-700' },
         ].map((feature, i) => (
           <div key={i} className="bg-white/80 backdrop-blur rounded-xl p-4 flex items-center gap-3 shadow-sm">
             <div className={`w-10 h-10 bg-gradient-to-br ${feature.color} rounded-lg flex items-center justify-center text-white shadow-sm`}>

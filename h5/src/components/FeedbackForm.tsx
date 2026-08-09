@@ -26,6 +26,8 @@ const quickIssues = [
   '柜门关不上',
 ];
 
+const PHONE_RE = /^1\d{10}$/;
+
 export default function FeedbackForm({ qrData, onSubmit, onBack }: FeedbackFormProps) {
   const [content, setContent] = useState('');
   const [category, setCategory] = useState<FeedbackCategory | ''>('');
@@ -35,6 +37,7 @@ export default function FeedbackForm({ qrData, onSubmit, onBack }: FeedbackFormP
   const [contactAllowed, setContactAllowed] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [contentError, setContentError] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
 
   const handleQuickIssue = (issue: string) => {
     setContent(issue + '，');
@@ -42,10 +45,21 @@ export default function FeedbackForm({ qrData, onSubmit, onBack }: FeedbackFormP
   };
 
   const handleSubmit = () => {
+    let hasError = false;
     if (content.trim().length < 5) {
       setContentError(true);
-      return;
+      hasError = true;
+    } else {
+      setContentError(false);
     }
+    if (contactPhone.trim() && !PHONE_RE.test(contactPhone.trim())) {
+      setPhoneError(true);
+      setShowAdvanced(true);
+      hasError = true;
+    } else {
+      setPhoneError(false);
+    }
+    if (hasError) return;
     onSubmit({
       vehicle_id: qrData.vehicle_id,
       content_raw: content.trim(),
@@ -90,14 +104,17 @@ export default function FeedbackForm({ qrData, onSubmit, onBack }: FeedbackFormP
         transition={{ delay: 0.1 }}
         className="mb-4"
       >
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
+        <label htmlFor="feedback-content" className="block text-sm font-semibold text-gray-700 mb-2">
           请描述您遇到的问题 <span className="text-red-500">*</span>
         </label>
         <div className="relative">
           <textarea
+            id="feedback-content"
             value={content}
             onChange={(e) => { setContent(e.target.value); setContentError(false); }}
             placeholder="例如：柜门打不开，已经等了5分钟了，急着取件……"
+            aria-invalid={contentError}
+            aria-describedby={contentError ? 'feedback-content-error' : undefined}
             className={`w-full h-32 p-4 rounded-2xl border-2 text-gray-800 placeholder-gray-400 resize-none transition-colors ${
               contentError ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-neolix-500'
             }`}
@@ -109,6 +126,8 @@ export default function FeedbackForm({ qrData, onSubmit, onBack }: FeedbackFormP
         </div>
         {contentError && (
           <motion.p
+            id="feedback-content-error"
+            role="alert"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             className="text-red-500 text-xs mt-1 flex items-center gap-1"
@@ -200,32 +219,70 @@ export default function FeedbackForm({ qrData, onSubmit, onBack }: FeedbackFormP
             className="space-y-3 mb-4 overflow-hidden"
           >
             <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <label htmlFor="contact-name" className="contents sr-only">
+                <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                您的称呼
+              </label>
+              <User className="w-4 h-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
               <input
+                id="contact-name"
                 type="text"
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
                 placeholder="您的称呼"
+                aria-label="您的称呼"
                 className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-800 placeholder-gray-400 focus:border-neolix-500 text-sm"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              <input
-                type="tel"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="联系电话（方便我们联系您处理）"
-                className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-800 placeholder-gray-400 focus:border-neolix-500 text-sm"
-              />
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <label htmlFor="contact-phone" className="contents sr-only">
+                  <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  联系电话（方便我们联系您处理）
+                </label>
+                <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                <input
+                  id="contact-phone"
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(e) => { setContactPhone(e.target.value); setPhoneError(false); }}
+                  placeholder="联系电话（方便我们联系您处理）"
+                  aria-label="联系电话"
+                  aria-invalid={phoneError}
+                  aria-describedby={phoneError ? 'contact-phone-error' : undefined}
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  className={`flex-1 px-3 py-2.5 rounded-xl border bg-white text-gray-800 placeholder-gray-400 focus:border-neolix-500 text-sm transition-colors ${
+                    phoneError ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                  }`}
+                />
+              </div>
+              {phoneError && (
+                <motion.p
+                  id="contact-phone-error"
+                  role="alert"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="text-red-500 text-xs pl-6 flex items-center gap-1"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  手机号格式不正确，请输入11位以1开头的号码
+                </motion.p>
+              )}
             </div>
             <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <label htmlFor="location-detail" className="contents sr-only">
+                <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                具体位置（如：XX小区3号门）
+              </label>
+              <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
               <input
+                id="location-detail"
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="具体位置（如：XX小区3号门）"
+                aria-label="具体位置"
                 className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-800 placeholder-gray-400 focus:border-neolix-500 text-sm"
               />
             </div>

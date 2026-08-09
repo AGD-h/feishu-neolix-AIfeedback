@@ -94,6 +94,32 @@ input:focus, textarea:focus, select:focus {
   outline: none;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Keyboard focus visibility (WCAG 2.1 2.4.7) */
+*:focus-visible {
+  outline: 2px solid #f97316;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #ea580c;
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #f97316;
+  outline-offset: 1px;
+  border-color: #f97316 !important;
+}
+
 input, textarea {
   -webkit-appearance: none;
   appearance: none;

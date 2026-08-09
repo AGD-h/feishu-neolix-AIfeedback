@@ -32,7 +32,7 @@ const categoryEmoji: Record<string, string> = {
 const priorityColors: Record<string, { bg: string; text: string; label: string }> = {
   'P0': { bg: 'bg-red-500', text: 'text-white', label: '紧急' },
   'P1': { bg: 'bg-orange-500', text: 'text-white', label: '高优' },
-  'P2': { bg: 'bg-yellow-400', text: 'text-gray-900', label: '普通' },
+  'P2': { bg: 'bg-yellow-400', text: 'text-yellow-950', label: '普通' },
   'P3': { bg: 'bg-green-500', text: 'text-white', label: '低优' },
 };
 
