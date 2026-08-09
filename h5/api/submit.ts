@@ -13,6 +13,33 @@
 
 const TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
 
+// 请求超时时间（毫秒）
+const FETCH_TIMEOUT = 10_000;
+// 请求体最大大小（字节）
+const MAX_BODY_SIZE = 10_000;
+
+// ---------------------------------------------------------------------------
+// 带超时的 fetch 封装
+// ---------------------------------------------------------------------------
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeout = FETCH_TIMEOUT,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const resp = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return resp;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 获取飞书 tenant_access_token（有效期约 2 小时，每次请求都重新获取即可）
 // ---------------------------------------------------------------------------
@@ -24,11 +51,15 @@ async function getTenantToken(): Promise<string> {
     throw new Error('飞书应用凭证未配置（FEISHU_APP_ID / FEISHU_APP_SECRET）');
   }
 
-  const resp = await fetch(TOKEN_URL, {
+  const resp = await fetchWithTimeout(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
   });
+
+  if (!resp.ok) {
+    throw new Error(`飞书鉴权接口 HTTP ${resp.status}`);
+  }
 
   const data = (await resp.json()) as { code: number; msg: string; tenant_access_token: string };
   if (data.code !== 0) {
@@ -49,7 +80,7 @@ async function createRecord(
 ): Promise<{ recordId: string }> {
   const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`;
 
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -57,6 +88,10 @@ async function createRecord(
     },
     body: JSON.stringify({ fields }),
   });
+
+  if (!resp.ok) {
+    throw new Error(`飞书写入接口 HTTP ${resp.status}`);
+  }
 
   const data = (await resp.json()) as {
     code: number;
@@ -115,6 +150,19 @@ function json(data: unknown, status = 200): Response {
 }
 
 // ---------------------------------------------------------------------------
+// 日志辅助：生产环境用 console，避免泄露敏感信息
+// ---------------------------------------------------------------------------
+function log(level: 'info' | 'error', message: string, extra?: Record<string, unknown>) {
+  const ts = new Date().toISOString();
+  const prefix = `[submit][${ts}]`;
+  if (level === 'error') {
+    console.error(prefix, message, extra ?? '');
+  } else {
+    console.log(prefix, message, extra ?? '');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Serverless Function 入口
 // ---------------------------------------------------------------------------
 export default async function handler(request: Request): Promise<Response> {
@@ -132,25 +180,47 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   if (request.method !== 'POST') {
+    log('error', `不支持的请求方法: ${request.method}`);
     return json({ error: '仅支持 POST 请求' }, 405);
+  }
+
+  // 请求体大小限制
+  const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
+  if (contentLength > MAX_BODY_SIZE) {
+    log('error', `请求体过大: ${contentLength} bytes`);
+    return json({ error: '请求体过大，请缩短反馈内容' }, 413);
   }
 
   const appToken = process.env.BITABLE_APP_TOKEN;
   const tableId = process.env.BITABLE_TABLE_ID;
 
   if (!appToken || !tableId) {
+    log('error', '多维表格配置缺失');
     return json({ error: '多维表格配置缺失（BITABLE_APP_TOKEN / BITABLE_TABLE_ID）' }, 500);
   }
+
+  const startTime = Date.now();
 
   try {
     const body = await request.json().catch(() => null);
     if (!body || !body.vehicle_id || !body.content_raw) {
+      log('error', '缺少必填字段', { has_body: !!body, has_vehicle_id: !!body?.vehicle_id, has_content_raw: !!body?.content_raw });
       return json({ error: '缺少必填字段：vehicle_id 或 content_raw' }, 400);
     }
+
+    log('info', '开始处理提交', {
+      vehicle_id: body.vehicle_id,
+      content_length: String(body.content_raw?.length ?? 0),
+      category: body.category || '(未指定)',
+      has_contact: !!(body.contact_name || body.contact_phone),
+    });
 
     const token = await getTenantToken();
     const fields = buildFields(body);
     const { recordId } = await createRecord(appToken, tableId, token, fields);
+
+    const elapsed = Date.now() - startTime;
+    log('info', '提交成功', { record_id: recordId, elapsed_ms: elapsed });
 
     return json({
       ticket_id: recordId,
@@ -164,8 +234,20 @@ export default async function handler(request: Request): Promise<Response> {
       status: '已受理',
     });
   } catch (err) {
+    const elapsed = Date.now() - startTime;
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[submit]', message);
+    const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+
+    log('error', isTimeout ? '请求超时' : '服务器错误', {
+      error: message,
+      elapsed_ms: elapsed,
+      is_timeout: isTimeout,
+    });
+
+    if (isTimeout) {
+      return json({ error: '飞书API响应超时，请稍后重试' }, 504);
+    }
+
     return json({ error: `服务器错误: ${message}` }, 500);
   }
 }

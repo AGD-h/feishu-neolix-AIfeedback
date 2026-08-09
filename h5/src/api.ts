@@ -3,6 +3,7 @@ import { logger } from './utils/logger';
 
 const FEISHU_API_BASE = import.meta.env.VITE_FEISHU_API_BASE || '';
 const USE_REAL_API = import.meta.env.VITE_USE_REAL_API === 'true';
+const REQUEST_TIMEOUT = 15_000; // 15秒超时
 
 export type MockMode = 'success' | 'network_error' | 'server_error' | 'timeout';
 
@@ -80,20 +81,31 @@ export async function submitFeedback(data: FeedbackSubmitData): Promise<Feedback
   const apiUrl = `${FEISHU_API_BASE}/api/submit`;
   logger.info('API', `📡 发送请求到 ${apiUrl}`);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
   const t0 = performance.now();
   try {
     const resp = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
     const elapsed = Math.round(performance.now() - t0);
     logger.info('API', `响应状态: HTTP ${resp.status}（耗时 ${elapsed}ms）`);
 
     if (!resp.ok) {
       const errorText = await resp.text().catch(() => '无法读取错误详情');
       logger.error('API', `❌ 请求失败: HTTP ${resp.status}`, errorText.slice(0, 200));
+      if (resp.status === 504) {
+        throw new Error('服务器响应超时，请稍后重试');
+      }
+      if (resp.status >= 500) {
+        throw new Error('服务器异常，请稍后重试或联系管理员');
+      }
       throw new Error(`提交失败: HTTP ${resp.status}`);
     }
 
@@ -101,9 +113,25 @@ export async function submitFeedback(data: FeedbackSubmitData): Promise<Feedback
     logger.success('API', '✅ 后端返回成功', result);
     return result;
   } catch (err) {
+    clearTimeout(timeoutId);
     const elapsed = Math.round(performance.now() - t0);
+
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      logger.error('API', `⏱️ 请求超时（${elapsed}ms，超过 ${REQUEST_TIMEOUT / 1000}s）`);
+      throw new Error('请求超时，请检查网络信号后重试');
+    }
+
+    // 如果是我们主动抛出的错误，直接传递
+    if (err instanceof Error && err.message.startsWith('服务器')) {
+      logger.error('API', `❌ ${err.message}（${elapsed}ms）`);
+      throw err;
+    }
+    if (err instanceof Error && err.message.startsWith('提交失败')) {
+      throw err;
+    }
+
     logger.error('API', `❌ 网络异常（${elapsed}ms）`, err instanceof Error ? err.message : String(err));
-    throw err;
+    throw new Error('网络连接失败，请检查网络设置后重试');
   }
 }
 
