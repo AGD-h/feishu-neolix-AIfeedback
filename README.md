@@ -82,6 +82,7 @@ vercel --prod
 - [docs/H5_FEATURE_SPEC.md](docs/H5_FEATURE_SPEC.md) — Code Review 专用功能说明（新增文件清单+验证方式，reviewer 必读）
 - [LOCAL_TEST_GUIDE.md](LOCAL_TEST_GUIDE.md) — 本地模拟生产环境全流程测试指南
 - [h5/DEMO_GUIDE.md](h5/DEMO_GUIDE.md) — 演示操作手册（手机访问、4 个场景演示步骤）
+- [CHANGELOG.md](CHANGELOG.md) — 变更日志（本次所有新增功能 & 修复 & 文档的完整清单）
 
 ---
 
