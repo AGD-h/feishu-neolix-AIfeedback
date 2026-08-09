@@ -79,6 +79,7 @@ vercel --prod
 
 详见：
 - [h5/README.md](h5/README.md) — H5 完整文档（架构、环境变量、字段映射、错误码）
+- [docs/H5_FEATURE_SPEC.md](docs/H5_FEATURE_SPEC.md) — Code Review 专用功能说明（新增文件清单+验证方式，reviewer 必读）
 - [LOCAL_TEST_GUIDE.md](LOCAL_TEST_GUIDE.md) — 本地模拟生产环境全流程测试指南
 - [h5/DEMO_GUIDE.md](h5/DEMO_GUIDE.md) — 演示操作手册（手机访问、4 个场景演示步骤）
 
