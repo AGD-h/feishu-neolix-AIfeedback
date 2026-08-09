@@ -2,8 +2,7 @@ import type { FeedbackSubmitData, FeedbackResult } from './types';
 import { logger } from './utils/logger';
 
 const FEISHU_API_BASE = import.meta.env.VITE_FEISHU_API_BASE || '';
-const FEISHU_APP_TOKEN = import.meta.env.VITE_BITABLE_APP_TOKEN || '';
-const FEISHU_TABLE_ID = import.meta.env.VITE_BITABLE_TABLE_ID || '';
+const USE_REAL_API = import.meta.env.VITE_USE_REAL_API === 'true';
 
 export type MockMode = 'success' | 'network_error' | 'server_error' | 'timeout';
 
@@ -38,8 +37,8 @@ export async function submitFeedback(data: FeedbackSubmitData): Promise<Feedback
     has_contact: !!data.contact_phone,
   });
 
-  if (!FEISHU_API_BASE) {
-    logger.warn('API', '⚠️ 未配置 VITE_FEISHU_API_BASE，使用本地模拟AI分析模式（不会发送到真实后端）');
+  if (!USE_REAL_API) {
+    logger.warn('API', '⚠️ USE_REAL_API 未开启，使用本地模拟AI分析模式（不会发送到真实后端）');
 
     if (_mockMode === 'network_error') {
       logger.info('API', `🧪 [模拟模式] 模拟网络错误...`);
@@ -78,14 +77,12 @@ export async function submitFeedback(data: FeedbackSubmitData): Promise<Feedback
     return result;
   }
 
-  logger.info('API', `📡 发送请求到 ${FEISHU_API_BASE}/feedback/submit`, {
-    app_token_configured: !!FEISHU_APP_TOKEN,
-    table_id_configured: !!FEISHU_TABLE_ID,
-  });
+  const apiUrl = `${FEISHU_API_BASE}/api/submit`;
+  logger.info('API', `📡 发送请求到 ${apiUrl}`);
 
   const t0 = performance.now();
   try {
-    const resp = await fetch(`${FEISHU_API_BASE}/feedback/submit`, {
+    const resp = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

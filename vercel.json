@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd h5 && npm install && npm run build",
+  "outputDirectory": "h5/dist",
+  "installCommand": "cd h5 && npm install",
+  "framework": "vite"
+}
