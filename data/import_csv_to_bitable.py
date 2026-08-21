@@ -102,7 +102,7 @@ def read_csv(file_path: str) -> List[Dict[str, Any]]:
 
 
 def convert_to_bitable_format(csv_records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """将 CSV 记录转换为飞书多维表格格式"""
+    """将 CSV 记录转换为飞书多维表格格式（严格按 18 字段 Schema）"""
     bitable_records = []
     
     for row in csv_records:
@@ -138,6 +138,24 @@ def convert_to_bitable_format(csv_records: List[Dict[str, Any]]) -> List[Dict[st
                 fields["csat_score"] = int(csat_score)
             except ValueError:
                 pass
+        
+        # ========== 补充 4 个新增字段（严格按 Schema 顺序放在 csat_score 后） ==========
+        # 联系人姓名（文本）
+        contact_name = row.get("contact_name", "")
+        if contact_name:
+            fields["contact_name"] = contact_name
+        # 联系人电话（文本，13x开头的11位）
+        contact_phone = row.get("contact_phone", "")
+        if contact_phone:
+            fields["contact_phone"] = contact_phone
+        # 是否允许联系（单选：是/否）
+        contact_allowed = row.get("contact_allowed", "")
+        if contact_allowed:
+            fields["contact_allowed"] = contact_allowed
+        # 位置详情（文本）
+        location_detail = row.get("location_detail", "")
+        if location_detail:
+            fields["location_detail"] = location_detail
         
         bitable_records.append({"fields": fields})
     
