@@ -45,6 +45,23 @@ CHAT_SEND_URL = "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type
 DOCX_CREATE_URL = "https://open.feishu.cn/open-apis/docx/v1/documents"
 DOCX_BLOCKS_URL = "https://open.feishu.cn/open-apis/docx/v1/documents/{document_id}/blocks/{block_id}/children"
 
+# ---- 历史数据兼容映射（修复问题 1/6）----
+# 原因：整改前 H5 submit.ts 写入的是中文"车身扫码"等；
+#       整改后按 AGENTS.md Schema 统一为英文 scan_qr 等；
+#       为了让新旧工单在周报统计里合并不拆扇区，做单向标准化。
+# 规则：中文→Schema 英文；已经是英文的保持原样不变
+_CHANNEL_COMPAT: Dict[str, str] = {
+    "车身扫码": "scan_qr",
+    "客服电话": "hotline",
+    "微信群":   "wechat_group",
+    "社媒舆情": "social_media",
+    "滴滴评价": "didi_review",
+    "车端告警": "telemetry",
+    "人工录入": "manual",
+}
+# 未知/空 priority 兜底：P2（体验级，与 H5 buildFields 默认一致）
+_PRIORITY_COMPAT_DEFAULT = "P2"
+
 # DeepSeek 聚类分析提示词（图表化视觉版）
 # 核心原则：用表格代替长段落，用 emoji 做视觉指示，简短精炼
 CLUSTER_PROMPT = """
@@ -863,9 +880,28 @@ def compute_statistics(records: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     for record in records:
         fields = record.get("fields", {})
+
+        # ============================================================
+        # 兼容标准化处理（修复问题 1/6，不修改原始 records，仅统计时替换）
+        # ============================================================
+        # 1) channel：历史中文 → Schema 英文；已是英文保持不变；空值→未知渠道
+        ch_raw = fields.get("channel") or ""
+        if isinstance(ch_raw, str) and ch_raw in _CHANNEL_COMPAT:
+            ch = _CHANNEL_COMPAT[ch_raw]
+        elif isinstance(ch_raw, str) and ch_raw in _CHANNEL_COMPAT.values():
+            ch = ch_raw  # 已经是英文标准值，不变
+        else:
+            ch = ch_raw if ch_raw else "未知渠道"
+
+        # 2) priority：只接受 P0-P3；空/异常值兜底 P2（与 H5 默认一致），不再归"未知"桶
+        pri_raw = fields.get("priority")
+        if pri_raw in ("P0", "P1", "P2", "P3"):
+            pri = pri_raw
+        else:
+            pri = _PRIORITY_COMPAT_DEFAULT
+
+        # 3) category / city / status：保持原逻辑不动
         cat = fields.get("category") or "未分类"
-        pri = fields.get("priority") or "未知"
-        ch = fields.get("channel") or "未知渠道"
         city = fields.get("city") or "未知城市"
         status = fields.get("status") or "未知状态"
 

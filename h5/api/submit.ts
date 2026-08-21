@@ -11,12 +11,35 @@
  *   BITABLE_TABLE_ID   — 工单表 table_id
  */
 
+// 从 types.ts 导入枚举映射表和类型（唯一 SSOT：AGENTS.md）
+import {
+  CHANNEL_MAP,
+  CATEGORY_PRIORITY_DEFAULT,
+  PRIORITY_RESPONSE_TIME,
+  type FeedbackCategory,
+  type FeedbackSubmitData,
+  type UserTier,
+} from '../src/types';
+
 const TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
 
 // 请求超时时间（毫秒）
 const FETCH_TIMEOUT = 10_000;
 // 请求体最大大小（字节）
 const MAX_BODY_SIZE = 10_000;
+
+// ---------------------------------------------------------------------------
+// 生成符合 Schema 的 feedback_id：FB-YYYYMMDD-序号
+// 来源标识后缀：H=车身扫码（与 S=舆情/M=Mock 不重复）
+// ---------------------------------------------------------------------------
+function generateFeedbackId(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const seq4 = String(Math.floor(Math.random() * 9000 + 1000)); // 4 位随机，够用
+  return `FB-${y}${m}${d}-H${seq4}`; // H 前缀 = 扫码 H5 提交
+}
 
 // ---------------------------------------------------------------------------
 // 带超时的 fetch 封装
@@ -108,24 +131,47 @@ async function createRecord(
 
 // ---------------------------------------------------------------------------
 // 构建飞书多维表格的字段对象（字段名需与多维表格列名一致）
+// 严格按 AGENTS.md 工单 18 字段 Schema 顺序写入，不漏不增
 // ---------------------------------------------------------------------------
-function buildFields(body: {
-  vehicle_id: string;
-  content_raw: string;
-  category?: string;
-  contact_name?: string;
-  contact_phone?: string;
-  contact_allowed?: boolean;
-  location_detail?: string;
-}): Record<string, unknown> {
+function buildFields(body: FeedbackSubmitData): Record<string, unknown> {
+  // priority 兜底：用户选了分类就按映射，未选默认 P2（体验级，不会误触发 P0）
+  const category: FeedbackCategory | undefined = body.category;
+  const priority = category ? CATEGORY_PRIORITY_DEFAULT[category] : 'P2';
+  // user_tier 兜底：前端传了 hint 就用，否则"路人社区"（扫码场景最常见）
+  const validHints: UserTier[] = ['网点经理', '快递员', 'RaaS商户', '收件人', '路人社区', '监管方'];
+  const user_tier: UserTier =
+    body.user_tier_hint && validHints.includes(body.user_tier_hint as UserTier)
+      ? (body.user_tier_hint as UserTier)
+      : '路人社区';
+  // 当前时间：ISO 精确到分钟，与 Schema 和仿真数据 CSV 格式一致
+  const now = new Date();
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const created_at = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+
+  // 先填 18 字段（按 Schema 严格顺序），再覆盖非空联系人字段
   const fields: Record<string, unknown> = {
-    channel: '车身扫码',
-    vehicle_id: body.vehicle_id,
-    content_raw: body.content_raw,
-    status: '待处理',
+    // ===== 18 字段 Schema 按顺序 =====
+    feedback_id: generateFeedbackId(),   // 1. 符合 Schema：FB-YYYYMMDD-Hxxxx
+    channel: CHANNEL_MAP['车身扫码'],    // 2. 统一英文 scan_qr，与仿真/舆情一致
+    user_tier,                            // 3. 兜底路人社区
+    category: category || '',             // 4. 用户勾选或空字符串
+    priority,                             // 5. 按分类兜底，不会空
+    status: '待处理',                     // 6. 枚举：待处理/处理中/待回访/已闭环
+    vehicle_id: body.vehicle_id,          // 7. 必填
+    city: body.city || '',                // 8. 问题4：二维码透传，空就给空串
+    content_raw: body.content_raw,        // 9. 必填
+    content_summary: '',                  // 10. AI 摘要，留空等飞书 AI 字段自动填
+    created_at,                           // 11. 后端当前时间戳（精确到分钟）
+    closed_at: '',                        // 12. 新工单未关闭，空串
+    assigned_to: '',                      // 13. 未分派，走飞书自动化
+    csat_score: '',                       // 14. 未回访，空
+    contact_name: '',                     // 15. 默认空，下面有值再覆盖
+    contact_phone: '',                    // 16. 默认空
+    contact_allowed: '',                  // 17. ⚠️ 只能是 "是"/"否"/"" 三值（单选枚举）
+    location_detail: '',                  // 18. 默认空
   };
 
-  if (body.category) fields.category = body.category;
+  // ===== 联系人字段（有值才覆盖，空就保持空串）=====
   if (body.contact_name) fields.contact_name = body.contact_name;
   if (body.contact_phone) fields.contact_phone = body.contact_phone;
   if (body.contact_allowed !== undefined) {
@@ -220,17 +266,26 @@ export default async function handler(request: Request): Promise<Response> {
     const { recordId } = await createRecord(appToken, tableId, token, fields);
 
     const elapsed = Date.now() - startTime;
-    log('info', '提交成功', { record_id: recordId, elapsed_ms: elapsed });
+    log('info', '提交成功', {
+      record_id: recordId,
+      feedback_id: fields.feedback_id,
+      elapsed_ms: elapsed,
+    });
+
+    // category/priority/resp_time 与 buildFields 内用同一份逻辑，保证前后一致
+    const category: FeedbackCategory = body.category || '体验';
+    const priority = CATEGORY_PRIORITY_DEFAULT[category];
+    const resp_time = PRIORITY_RESPONSE_TIME[priority];
 
     return json({
-      ticket_id: recordId,
-      category: body.category || '待AI识别',
-      priority: '待AI判定',
+      ticket_id: String(fields.feedback_id),  // 用 Schema 格式的 FB-xxx-ID，与其他渠道统一
+      category,                                // ✅ 严格是 FeedbackCategory 枚举值
+      priority,                                // ✅ 严格是 P0-P3（问题3修）
       summary:
         body.content_raw.length > 30
           ? body.content_raw.slice(0, 28) + '...'
           : body.content_raw,
-      estimated_response_time: '待系统分配',
+      estimated_response_time: resp_time,     // ✅ '5分钟内/30分钟内/1小时内/24小时内'
       status: '已受理',
     });
   } catch (err) {

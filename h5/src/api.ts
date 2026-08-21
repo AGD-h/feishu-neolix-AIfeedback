@@ -1,4 +1,6 @@
 import type { FeedbackSubmitData, FeedbackResult } from './types';
+// 与 submit.ts 共用同一份枚举映射常量（唯一 SSOT：AGENTS.md Schema）
+import { CATEGORY_PRIORITY_DEFAULT, PRIORITY_RESPONSE_TIME } from './types';
 import { logger } from './utils/logger';
 
 const FEISHU_API_BASE = import.meta.env.VITE_FEISHU_API_BASE || '';
@@ -161,28 +163,22 @@ function simulateAIAnalysis(data: FeedbackSubmitData): FeedbackResult {
     logger.info('AI', `使用用户手动选择的分类: ${category}`);
   }
 
-  const priorityMap: Record<string, 'P0'|'P1'|'P2'|'P3'> = {
-    '安全': 'P0', '故障': 'P1', '投诉': 'P1', '体验': 'P2', '建议': 'P3',
-  };
-  const timeMap: Record<string, string> = {
-    'P0': '5分钟内', 'P1': '30分钟内', 'P2': '2小时内', 'P3': '24小时内',
-  };
-
-  const priority = priorityMap[category];
-  logger.info('AI', `优先级判定: ${category} → ${priority}（预计响应: ${timeMap[priority]}）`);
+  // 直接复用 types.ts 的共享常量，与 submit.ts 保证 100% 一致
+  const priority = CATEGORY_PRIORITY_DEFAULT[category];
+  const resp_time = PRIORITY_RESPONSE_TIME[priority];
+  logger.info('AI', `优先级判定: ${category} → ${priority}（预计响应: ${resp_time}）`);
 
   const now = new Date();
-  const dateStr = now.getFullYear().toString() +
-    (now.getMonth() + 1).toString().padStart(2, '0') +
-    now.getDate().toString().padStart(2, '0');
-  const random = Math.floor(Math.random() * 9000 + 1000);
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const dateStr = `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}`;
+  const seq4 = Math.floor(Math.random() * 9000 + 1000); // 4位随机
 
   const result: FeedbackResult = {
-    ticket_id: `NEO${dateStr}${random}`,
+    ticket_id: `FB-${dateStr}-M${seq4}`,  // M 前缀 = Mock（本地模拟模式），与 H=H5扫码 / S=舆情 / 仿真无后缀 天然不冲突
     category,
     priority,
     summary: content.length > 30 ? content.slice(0, 28) + '...' : content,
-    estimated_response_time: timeMap[priority],
+    estimated_response_time: resp_time,  // PRIORITY_RESPONSE_TIME 已修正 P2=1小时内（按 Schema）
     status: '已受理',
   };
 

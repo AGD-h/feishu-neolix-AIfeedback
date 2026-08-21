@@ -64,21 +64,29 @@ export default function App() {
   }, [page]);
 
   const handleSubmit = async (data: FeedbackSubmitData, isRetry = false) => {
+    // 组装最终 payload：把二维码解析出的 city / user_tier 信息注入，透传给后端（submit.ts buildFields 需要 city 字段）
+    const payload: FeedbackSubmitData = {
+      ...data,
+      city: qrData.city || '',                          // 二维码解析出的城市（北京/上海/苏州等），写入 Schema city 字段
+      user_tier_hint: '收件人',                         // 一车一码默认是收件人扫码场景，给后端兜底参考
+    };
+
     logger.info('Form', isRetry ? '🔄 用户重试提交反馈' : '🔘 用户点击「提交反馈」按钮', {
-      content_preview: data.content_raw.slice(0, 50) + (data.content_raw.length > 50 ? '...' : ''),
-      content_length: data.content_raw.length,
-      category: data.category || '(未选择，将AI自动识别)',
-      contact_provided: !!(data.contact_name || data.contact_phone),
-      vehicle_id: data.vehicle_id,
+      content_preview: payload.content_raw.slice(0, 50) + (payload.content_raw.length > 50 ? '...' : ''),
+      content_length: payload.content_raw.length,
+      category: payload.category || '(未选择，将AI自动识别)',
+      contact_provided: !!(payload.contact_name || payload.contact_phone),
+      vehicle_id: payload.vehicle_id,
+      city: payload.city || '(二维码未包含城市，将默认留空)',
       ...(isRetry && { retry_attempt: failCount + 1 }),
     });
 
-    setSubmitData(data);
+    setSubmitData(payload);  // 存的是最终 payload，重试时不会丢 city
     navigateTo('submitting', 'form');
 
     try {
       logger.info('Form', '⏳ 开始调用API提交...');
-      const aiResult = await submitFeedback(data);
+      const aiResult = await submitFeedback(payload);
       logger.success('Form', '✅ 提交流程全部完成', {
         ticket_id: aiResult.ticket_id,
         category: aiResult.category,

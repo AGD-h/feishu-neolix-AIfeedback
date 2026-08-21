@@ -148,10 +148,13 @@ def convert_to_bitable_format(csv_records: List[Dict[str, Any]]) -> List[Dict[st
         contact_phone = row.get("contact_phone", "")
         if contact_phone:
             fields["contact_phone"] = contact_phone
-        # 是否允许联系（单选：是/否）
-        contact_allowed = row.get("contact_allowed", "")
-        if contact_allowed:
-            fields["contact_allowed"] = contact_allowed
+        # ⚠️ 注释哨兵（AGENTS.md Schema 约束）：contact_allowed 只能是 3 种合法值之一
+        #   合法值（字符串）："是" / "否" / ""(空)
+        #   严禁写入 True/False/0/1/true/false/yes/no 等布尔或英文值！
+        #   改此段前须与 gen_mock_data.py、search_public_opinion.py、h5/api/submit.ts 保持一致
+        contact_allowed_raw = row.get("contact_allowed", "")
+        if isinstance(contact_allowed_raw, str) and contact_allowed_raw in ("是", "否"):
+            fields["contact_allowed"] = contact_allowed_raw  # 只有严格合法值才写入，否则飞书单选字段会报错
         # 位置详情（文本）
         location_detail = row.get("location_detail", "")
         if location_detail:
