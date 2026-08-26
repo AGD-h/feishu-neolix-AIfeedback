@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, AlertTriangle, ChevronDown, ChevronUp, User, Phone, MapPin } from 'lucide-react';
-import type { QRCodeData, FeedbackSubmitData, FeedbackCategory } from '../types';
+import type { QRCodeData, FeedbackSubmitData, FeedbackCategory, ContactAllowed } from '../types';
 
 interface FeedbackFormProps {
   qrData: QRCodeData;
@@ -34,7 +34,8 @@ export default function FeedbackForm({ qrData, onSubmit, onBack }: FeedbackFormP
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [location, setLocation] = useState(qrData.location || '');
-  const [contactAllowed, setContactAllowed] = useState(false);
+  // contact_allowed 严格三态：'是'/'否'/''（空串=用户未表态）
+  const [contactAllowed, setContactAllowed] = useState<ContactAllowed>('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [contentError, setContentError] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
@@ -286,15 +287,37 @@ export default function FeedbackForm({ qrData, onSubmit, onBack }: FeedbackFormP
                 className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-800 placeholder-gray-400 focus:border-neolix-500 text-sm"
               />
             </div>
-            <label className="flex items-center gap-2 px-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={contactAllowed}
-                onChange={(e) => setContactAllowed(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-neolix-600 focus:ring-neolix-500"
-              />
-              <span className="text-sm text-gray-600">允许工作人员联系我了解详情</span>
-            </label>
+            {/* 联系意愿：三态（是/否/未选择），空串表示用户未表态不写入 */}
+            <div className="flex flex-col gap-1.5">
+              <p className="text-sm text-gray-600 px-1">希望工作人员联系您了解详情吗？</p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setContactAllowed(contactAllowed === '是' ? '' : '是')}
+                  className={`flex-1 px-3 py-2 rounded-xl border text-sm transition-all ${
+                    contactAllowed === '是'
+                      ? 'border-neolix-500 bg-neolix-50 text-neolix-700 font-semibold shadow-inner'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  ✅ 允许联系
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setContactAllowed(contactAllowed === '否' ? '' : '否')}
+                  className={`flex-1 px-3 py-2 rounded-xl border text-sm transition-all ${
+                    contactAllowed === '否'
+                      ? 'border-gray-500 bg-gray-100 text-gray-700 font-semibold shadow-inner'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  🙅 不希望打扰
+                </button>
+              </div>
+              {contactAllowed === '' && (
+                <p className="text-[11px] text-gray-400 px-1">未选择则视为暂不表态，工作人员不会主动联系</p>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

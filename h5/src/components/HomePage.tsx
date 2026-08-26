@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { MessageSquare, QrCode, Clock, Shield, ChevronRight, MapPin } from 'lucide-react';
+import { MessageSquare, QrCode, Clock, Shield, ChevronRight, MapPin, Award } from 'lucide-react';
 import type { QRCodeData } from '../types';
 
 interface HomePageProps {
@@ -17,9 +17,17 @@ export default function HomePage({ qrData, onStart }: HomePageProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="bg-white rounded-2xl shadow-lg p-5 mb-6"
+        className="bg-white rounded-2xl shadow-lg p-5 mb-6 relative overflow-hidden"
       >
-        <div className="flex items-center gap-3 mb-4">
+        {/* 右上角大赛徽章（Top3加分改造①）*/}
+        <div className="absolute top-3 right-3 flex items-center gap-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-2.5 py-1 rounded-full shadow-md">
+          <Award className="w-3 h-3" />
+          <span className="text-[10px] sm:text-xs font-semibold whitespace-nowrap leading-tight">
+            2026飞书AI先锋大赛 · 参赛
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 mb-4 pr-[108px] sm:pr-[118px]">
           <div className="w-14 h-14 bg-gradient-to-br from-neolix-500 to-neolix-600 rounded-2xl flex items-center justify-center shadow-md">
             <span className="text-3xl">🚗</span>
           </div>

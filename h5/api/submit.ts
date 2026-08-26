@@ -152,7 +152,7 @@ function buildFields(body: FeedbackSubmitData): Record<string, unknown> {
   const fields: Record<string, unknown> = {
     // ===== 18 字段 Schema 按顺序 =====
     feedback_id: generateFeedbackId(),   // 1. 符合 Schema：FB-YYYYMMDD-Hxxxx
-    channel: CHANNEL_MAP['车身扫码'],    // 2. 统一英文 scan_qr，与仿真/舆情一致
+    channel: 'scan_qr' as const,    // 2. 统一英文枚举（扫码场景固定值，Schema 7 英文之一）
     user_tier,                            // 3. 兜底路人社区
     category: category || '',             // 4. 用户勾选或空字符串
     priority,                             // 5. 按分类兜底，不会空
@@ -174,9 +174,11 @@ function buildFields(body: FeedbackSubmitData): Record<string, unknown> {
   // ===== 联系人字段（有值才覆盖，空就保持空串）=====
   if (body.contact_name) fields.contact_name = body.contact_name;
   if (body.contact_phone) fields.contact_phone = body.contact_phone;
-  if (body.contact_allowed !== undefined) {
-    fields.contact_allowed = body.contact_allowed ? '是' : '否';
+  // contact_allowed 严格校验：只接受 "是"/"否"/"" 三态字符串，其它值一律丢弃（保证飞书单选字段不会写入非法值）
+  if (body.contact_allowed === '是' || body.contact_allowed === '否') {
+    fields.contact_allowed = body.contact_allowed;
   }
+  // 其余情况（空串 / undefined / 非法值）：保持 ''，不报错也不写入
   if (body.location_detail) fields.location_detail = body.location_detail;
 
   return fields;
@@ -212,6 +214,21 @@ function log(level: 'info' | 'error', message: string, extra?: Record<string, un
 // Serverless Function 入口
 // ---------------------------------------------------------------------------
 export default async function handler(request: Request): Promise<Response> {
+  // ========== 启动前：环境变量完整性检查（新手排障用，缺失直接告诉配置名）==========
+  const requiredEnvs = ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'BITABLE_APP_TOKEN', 'BITABLE_TABLE_ID'] as const;
+  const missingEnvs: string[] = requiredEnvs.filter((k) => !process.env[k]);
+  if (missingEnvs.length > 0) {
+    log('error', `Serverless 未配置环境变量: ${missingEnvs.join(', ')}`);
+    return json(
+      {
+        error: `服务器配置缺失，请联系管理员在 Vercel Dashboard 配置以下环境变量：${missingEnvs.join('、')}`,
+        missing: missingEnvs,
+        hint: '变量名绝不能写错，少一个就会报错，全部是全大写 + 下划线',
+      },
+      500,
+    );
+  }
+
   // CORS 预检请求
   if (request.method === 'OPTIONS') {
     return new Response(null, {

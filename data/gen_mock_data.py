@@ -9,7 +9,21 @@
 import csv
 import os
 import random
+import sys
 from datetime import datetime, timedelta
+
+# ============================================================
+# ★ 工单 Schema 常量：统一从根目录 schema_constants.py 引用
+# ============================================================
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+from schema_constants import (
+    WORKORDER_SCHEMA_FIELDS,  # 18 字段标准顺序（CSV 列头强制按此输出，不靠 dict 插入顺序）
+    VALID_CHANNELS,           # 7 英文 channel 枚举（随机生成时校验）
+    VALID_PRIORITIES,         # P0/P1/P2/P3
+)
 
 # ============ 配置区（想调整就改这里） ============
 TOTAL = 800                # 生成条数（500–1000 之间）
@@ -165,7 +179,8 @@ def main():
         created = random_time_in_days(DAYS)
         datekey = created.strftime("%Y%m%d")
         date_counters[datekey] = date_counters.get(datekey, 0) + 1
-        fid = f"FB-{datekey}-{date_counters[datekey]:04d}"
+        # 按约定：仿真Mock数据用 M 前缀（舆情S / H5扫码H / 仿真M）
+        fid = f"FB-{datekey}-M{date_counters[datekey]:04d}"
 
         # 大部分历史工单已闭环（有 closed_at 和评分），近 3 天的多数还在处理中
         is_recent = (datetime.now() - created).days < 3
@@ -215,7 +230,8 @@ def main():
     rows.sort(key=lambda r: r["created_at"])
     csv_path = os.path.join(OUT_DIR, "mock_feedback.csv")
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        # ★ 强制用 WORKORDER_SCHEMA_FIELDS 作为列头（不依赖 dict.keys() 插入顺序，跨 Python 版本稳定）
+        writer = csv.DictWriter(f, fieldnames=WORKORDER_SCHEMA_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 

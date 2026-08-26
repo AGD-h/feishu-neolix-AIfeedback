@@ -45,36 +45,26 @@ from typing import Any, Dict, List, Optional
 import requests
 from dotenv import load_dotenv
 
+# ============================================================
+# ★ 工单 Schema 常量：统一从根目录 schema_constants.py 引用
+#   （保证 18 字段顺序、枚举值全仓库一致，SSOT 唯一来源）
+# ============================================================
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+from schema_constants import (
+    WORKORDER_SCHEMA_FIELDS,     # 18 字段顺序列表（CSV 列头 / 飞书写入顺序）
+    VALID_CONTACT_ALLOWED,       # contact_allowed 三态合法值
+    CATEGORY_PRIORITY_DEFAULT,   # 分类 → 优先级默认映射（兜底 fallback 规则用）
+)
+
 try:
     import openai
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
 
-
-# ============================================================
-# ★ 工单 Schema 常量（18字段严格顺序，AGENTS.md 唯一标准）★
-# ============================================================
-WORKORDER_SCHEMA_FIELDS = [
-    "feedback_id",      # 1. 文本 FB-YYYYMMDD-Sxxxx
-    "channel",          # 2. 枚举 social_media（统一映射）
-    "user_tier",        # 3. 枚举 网点经理/快递员/RaaS商户/收件人/路人社区/监管方
-    "category",         # 4. 枚举 安全/故障/体验/投诉/建议
-    "priority",         # 5. 枚举 P0/P1/P2/P3
-    "status",           # 6. 枚举 待处理/处理中/待回访/已闭环
-    "vehicle_id",       # 7. 文本 如 NX-BJ-0233，可为空
-    "city",             # 8. 文本 城市名
-    "content_raw",      # 9. 长文本 原始反馈内容
-    "content_summary",  # 10. 长文本 AI 摘要
-    "created_at",       # 11. 日期时间 ISO 精确到分钟
-    "closed_at",        # 12. 日期时间 可为空
-    "assigned_to",      # 13. 文本 处理人姓名
-    "csat_score",       # 14. 数字 1-5，可为空
-    "contact_name",     # 15. 文本 联系人姓名，可为空（舆情采集默认空）
-    "contact_phone",    # 16. 文本 联系人电话，可为空（舆情采集默认空）
-    "contact_allowed",  # 17. 单选 是/否，可为空（舆情采集默认空）
-    "location_detail",  # 18. 文本 位置详情，可为空
-]
 
 # ============================================================
 # SerpAPI 接口配置
@@ -364,40 +354,69 @@ def fallback_clean_lead(title: str, snippet: str, source_platform: str) -> Dict[
     """
     text = f"{title} {snippet}"
 
-    # 1. category：基于关键词匹配
-    if any(kw in text for kw in ["撞", "刮", "事故", "摔倒", "危险", "安全", "消防", "监管", "报备", "行人"]):
+    # 1. category：基于关键词匹配（与 CLEAN_PROMPT 专家规则 100% 对齐）
+    if any(kw in text for kw in [
+        "撞", "剐", "刮", "事故", "摔倒", "砸", "压", "受伤", "流血",
+        "120", "报警", "110", "监管", "报备", "整改", "消防通道", "违规",
+        "安全隐患", "火灾", "漏电", "危险", "安全", "消防", "行人",
+    ]):
         category = "安全"
-    elif any(kw in text for kw in ["坏", "故障", "打不开", "趴窝", "没电", "卡住", "失灵", "充不了"]):
+    elif any(kw in text for kw in [
+        "坏", "坏了", "故障", "打不开", "趴窝", "停住不动", "没电", "卡住",
+        "卡顿", "急刹", "骤停", "失灵", "充不了", "充电", "续航", "断网",
+        "无信号", "死机", "黑屏", "跑偏", "取件口",
+    ]):
         category = "故障"
-    elif any(kw in text for kw in ["投诉", "不满", "赔偿", "差评", "垃圾", "退钱", "说法"]):
+    elif any(kw in text for kw in [
+        "投诉", "不满", "赔偿", "差评", "垃圾", "退钱", "说法", "赔",
+        "退款", "举报", "客服态度差",
+    ]):
         category = "投诉"
-    elif any(kw in text for kw in ["建议", "希望", "能不能", "优化", "改进", "应该", "建议增加"]):
+    elif any(kw in text for kw in [
+        "建议", "希望", "能不能", "优化", "改进", "应该", "建议增加",
+        "觉得可以", "路线规划", "推广", "扩张", "政策", "行业动态",
+        "展会", "合作",
+    ]):
         category = "建议"
     else:
         category = "体验"
 
-    # 2. priority：基于 category + 关键词强度
-    if category == "安全" and any(kw in text for kw in ["撞", "事故", "摔倒", "监管", "消防"]):
-        priority = "P0"
-    elif category in ("安全", "故障") and any(kw in text for kw in ["严重", "紧急", "全断", "无法使用"]):
-        priority = "P1"
+    # 2. priority：基于 category + 关键词强度（与 CLEAN_PROMPT 分级定义一致）
+    if category == "安全" and any(kw in text for kw in [
+        "撞", "事故", "摔倒", "受伤", "120", "监管", "消防", "交警", "110",
+    ]):
+        priority = "P0"  # 安全事故/监管介入 = 5 分钟响应
+    elif category in ("安全", "故障") and any(kw in text for kw in [
+        "严重", "紧急", "全断", "无法使用", "趴窝", "大面积", "充电失败",
+    ]):
+        priority = "P1"  # 运营中断 = 30 分钟响应
     elif category == "投诉":
         priority = "P2"
     elif category == "建议":
         priority = "P3"
     else:
-        priority = "P2"
+        priority = "P2"  # 体验类 = 1 小时响应
 
-    # 3. user_tier：基于平台 + 内容推断
+    # 3. user_tier：基于平台 + 内容推断（与 CLEAN_PROMPT user_tier 6 枚举一致）
     if source_platform == "黑猫投诉":
         user_tier = "收件人"  # 黑猫投诉多是C端用户
-    elif any(kw in text for kw in ["小区", "孩子", "居民", "业主", "走路", "扰民"]):
+    elif any(kw in text for kw in [
+        "小区", "孩子", "居民", "业主", "走路", "扰民", "路人", "社区",
+        "大爷", "大妈", "围观",
+    ]):
         user_tier = "路人社区"
-    elif any(kw in text for kw in ["快递", "驿站", "派件", "网点", "骑手"]):
+    elif any(kw in text for kw in [
+        "快递", "驿站", "派件", "网点", "骑手", "快递员", "小哥",
+    ]):
         user_tier = random.choice(["网点经理", "快递员"])
-    elif any(kw in text for kw in ["商家", "商户", "客户", "交货", "运费"]):
+    elif any(kw in text for kw in [
+        "商家", "商户", "客户", "交货", "运费", "RaaS", "合作方",
+    ]):
         user_tier = "RaaS商户"
-    elif any(kw in text for kw in ["监管", "报备", "整改", "消防通道", "违规"]):
+    elif any(kw in text for kw in [
+        "监管", "报备", "整改", "消防通道", "违规", "城管", "交警",
+        "园区", "管委会",
+    ]):
         user_tier = "监管方"
     else:
         user_tier = "收件人"
@@ -435,38 +454,141 @@ def fallback_clean_lead(title: str, snippet: str, source_platform: str) -> Dict[
 # ============================================================
 
 CLEAN_PROMPT = """
-你是舆情工单清洗助手。请根据以下线索原文，按 JSON 格式输出清洗后的标准工单字段。
-只输出 JSON，不要任何解释文字。
+你是「新石器无人配送车」舆情工单专业清洗员。基于提供的线索原文，按严格枚举规则输出标准工单 JSON，只输出 JSON，不加任何解释文字。
 
-字段要求（严格按此取值范围）：
-- category：安全/故障/体验/投诉/建议 5选1
-- priority：P0/P1/P2/P3 4选1
-  P0=安全事故/监管介入；P1=运营中断如车辆趴窝；P2=体验问题如取件失败；P3=建议咨询
-- user_tier：网点经理/快递员/RaaS商户/收件人/路人社区/监管方 6选1
-- city：如果原文提到具体城市名就填，否则空字符串
-- content_summary：30字以内的精炼摘要，包含平台+核心问题
-- ai_relevant：是/待确认/否，是否是新石器无人配送相关
-- ai_user_tier：同上 user_tier
-- ai_issue_type：同上 category
-- ai_confidence：百分比，如90%，表示判断可信程度
+========================================
+【硬约束 · 输出前必须自检】
+========================================
+1. 所有枚举字段必须从下方括号列出的值中选一个，绝对不能造新词。
+2. 若无法确定分类，优先根据【关键词→分类/分级映射表】做规则推断，不要瞎猜。
+3. 输出 JSON 后在心里再核对一遍：category 是否在 5 个里？priority 是否在 4 个里？发现不对立刻改。
 
-线索原文：
+========================================
+【字段定义 + 合法枚举】
+========================================
+- category（5选1，中文枚举）：
+    安全=人身/车辆/消防/监管类安全风险事件
+    故障=车辆硬件/软件/充电/续航/网络故障导致运营中断
+    体验=取件失败/扫码失败/速度慢/找车难/交互不顺畅等使用体验
+    投诉=明确表达不满/差评/赔偿/差评/举报等诉求
+    建议=功能/路线/运营模式/改进的提议或咨询
+- priority（4选1，英文枚举）：
+    P0  安全事故/监管介入/人员受伤/交通事故 → 5分钟响应
+    P1  车辆趴窝/全断/大面积故障/充电失败 → 30分钟响应
+    P2  取件失败/找车难/挡路/响应慢/投诉 → 1小时响应
+    P3  建议/咨询/行业动态讨论 → 24小时响应
+- user_tier（6选1，中文枚举）：
+    网点经理 / 快递员 / RaaS商户（租车/配送合作方）/ 收件人（C端取件用户）/ 路人社区（居民/行人/社区）/ 监管方（城管/消防/交警/园区）
+- city：原文提到的具体城市名，没提就空字符串
+- content_summary：35字以内精炼摘要，必须包含【来源平台】+【核心问题点】+【影响对象】
+- ai_relevant：是/待确认/否（是否与新石器无人配送车业务直接相关）
+- ai_user_tier：与 user_tier 相同
+- ai_issue_type：与 category 相同
+- ai_confidence：百分比，如 92%（枚举明确=90+，规则推断=70-89，瞎猜=40-69）
+
+========================================
+【关键词 → 分类/分级 强映射（命中率最高的专家规则）】
+========================================
+★ 安全类（category=安全）关键词：
+   撞 / 剐 / 刮 / 事故 / 摔倒 / 砸 / 压 / 受伤 / 流血 / 120 / 报警 / 110 /
+   监管 / 报备 / 整改 / 消防通道 / 违规 / 安全隐患 / 火灾 / 漏电
+   → 只要出现「撞/事故/受伤/120/监管/消防」且 category=安全 → priority 必为 P0
+   → 其余安全类且无严重后果 → priority=P1
+★ 故障类（category=故障）关键词：
+   坏了 / 故障 / 趴窝 / 停住不动 / 卡住 / 卡顿 / 急刹 / 骤停 / 失灵 /
+   打不开 / 取件口 / 充电 / 续航 / 没电 / 断网 / 无信号 / 死机 / 黑屏 / 跑偏
+   → 趴窝/全断/大面积/充电失败 → priority=P1
+   → 其他局部故障 → priority=P2
+★ 体验类（category=体验）关键词：
+   取件失败 / 找不到车 / 找车难 / 扫不开 / 扫码失败 / 太慢 / 速度慢 /
+   挡路 / 占道 / 挡着 / 绕路 / 位置偏 / 不认识 / 路线绕 / 等太久 / 电话打不通
+   → 基本 priority=P2
+★ 投诉类（category=投诉）关键词：
+   投诉 / 不满 / 差评 / 垃圾 / 赔偿 / 赔 / 退钱 / 退款 / 说法 / 举报 / 客服态度差
+   → 基本 priority=P2
+★ 建议类（category=建议）关键词：
+   建议 / 希望 / 能不能 / 能不能加 / 优化 / 改进 / 应该 / 觉得可以 / 建议增加 /
+   路线规划 / 推广 / 扩张 / 政策 / 行业动态 / 展会 / 合作
+   → 基本 priority=P3
+
+========================================
+【Few-Shot 示例（必须严格对齐此格式）】
+========================================
+示例 1（安全 P0）：
+线索标题：沈阳无人车把大爷刮倒后留纸条
+线索摘要：小亮送件途中剐蹭路边电动车致大爷擦伤，留下致歉纸条未获车主联系。
+输出：
+{{
+  "category": "安全",
+  "priority": "P0",
+  "user_tier": "路人社区",
+  "city": "沈阳",
+  "content_summary": "微博舆情：无人车剐蹭老人留致歉条未联系",
+  "ai_relevant": "是",
+  "ai_user_tier": "路人社区",
+  "ai_issue_type": "安全",
+  "ai_confidence": "95%"
+}}
+
+示例 2（故障 P1）：
+线索标题：深圳暴雨后 12 台新石器无人车趴窝停运
+线索摘要：大雨浸泡传感器失灵，多个小区用户反馈全天无车可用，影响快递配送。
+输出：
+{{
+  "category": "故障",
+  "priority": "P1",
+  "user_tier": "收件人",
+  "city": "深圳",
+  "content_summary": "知乎舆情：暴雨后12台无人车趴窝运营中断",
+  "ai_relevant": "是",
+  "ai_user_tier": "收件人",
+  "ai_issue_type": "故障",
+  "ai_confidence": "93%"
+}}
+
+示例 3（体验 P2）：
+线索标题：家楼下新石器车扫码3次都没打开
+线索摘要：取件码发过来但车身屏幕一直转圈，快递员电话也没人接，急死了。
+输出：
+{{
+  "category": "体验",
+  "priority": "P2",
+  "user_tier": "收件人",
+  "city": "",
+  "content_summary": "黑猫投诉：扫码三次失败车身屏幕转圈",
+  "ai_relevant": "是",
+  "ai_user_tier": "收件人",
+  "ai_issue_type": "体验",
+  "ai_confidence": "88%"
+}}
+
+示例 4（建议 P3）：
+线索标题：中汽无人车智能科技杭州公司重组打造L4级
+线索摘要：配置官宣待发布，行业人士预测将搭载激光雷达适配城市复杂路况。
+输出：
+{{
+  "category": "建议",
+  "priority": "P3",
+  "user_tier": "路人社区",
+  "city": "杭州",
+  "content_summary": "行业新闻：L4级无人车公司重组配置官宣待发",
+  "ai_relevant": "待确认",
+  "ai_user_tier": "路人社区",
+  "ai_issue_type": "建议",
+  "ai_confidence": "72%"
+}}
+
+========================================
+【线索原文（本轮输入）】
+========================================
 标题：{title}
 摘要：{snippet}
 平台：{source_platform}
 
-输出JSON格式示例：
-{{
-  "category": "体验",
-  "priority": "P2",
-  "user_tier": "路人社区",
-  "city": "北京",
-  "content_summary": "网友反馈无人车挡路影响通行",
-  "ai_relevant": "是",
-  "ai_user_tier": "路人社区",
-  "ai_issue_type": "体验",
-  "ai_confidence": "85%"
-}}
+========================================
+【输出】
+========================================
+直接输出 JSON 对象，不要 Markdown，不要代码块，不要额外文字。
 """
 
 
@@ -821,6 +943,9 @@ def main() -> None:
         print("--min-interval 和 --max-interval 参数不合法。")
         return
 
+    # 记录脚本启动时间（必须在最前面）
+    session_start_time = time.time()
+
     logger = setup_logger()
     project_root = get_project_root()
     output_dir = project_root / "data" / "output"
@@ -847,7 +972,7 @@ def main() -> None:
                 logger=logger,
             )
 
-    session_duration = time.time() - 0  # 简化
+    session_duration = time.time() - session_start_time
     if not args.mock:
         summary_text = stats.summary()
         logger.info(summary_text)

@@ -1420,15 +1420,20 @@ def build_report_header(record_count: int, bitable_url: str, stats: Optional[Dic
         cat_top_count = 0
         cat_top_pct = 0
 
-    ai_hours_saved = int(total / 5)  
-    risk_avoidance_value = int(high_pri_rate * 1000)  
-    auto_clustering_rate = 100  
+    # 估算AI替代的人工分析工时
+    # 估算依据：人工单条分类+聚类+记录约12分钟 → 每5条/小时（大赛演示估算值，可根据实际运营数据调整）
+    ai_hours_saved = int(total / 5) if total >= 5 else 0
+    risk_avoidance_value = int(high_pri_rate * 1000)  # 高优先级风险预警的潜在损失估算
+    auto_clustering_rate = 100  # 聚类步骤由DeepSeek全自动完成
 
-    last_week_total = int(total * 0.67)  
-    last_week_close_rate = max(85.0, close_rate - 5.0)
-    last_week_duration = max(24.0, avg_duration + 8.0) if avg_duration > 0 else 28.0
-    last_week_csat = max(3.5, avg_csat - 0.3) if avg_csat > 0 else 3.5
-    last_week_high_pri = min(25.0, high_pri_rate + 5.0)
+    # -------- 上周基线说明 --------
+    # MVP阶段仅拉取近7天工单，无真实上周同期数据接口（需额外拉取8-14天前记录）
+    # 为避免造假，将所有环比统一标注为「📊 首期基线」，后续可扩展真实环比查询
+    last_week_total = 0
+    last_week_close_rate = 0.0
+    last_week_duration = 0.0
+    last_week_csat = 0.0
+    last_week_high_pri = 0.0
 
     def _calc_change(current, last):
         if last == 0 or current == 0:
@@ -1464,9 +1469,9 @@ def build_report_header(record_count: int, bitable_url: str, stats: Optional[Dic
 | 价值维度 | 量化指标 | 说明 |
 |----------|---------|------|
 | ⚡ **AI自动化率** | {auto_clustering_rate}% | 全流程无人值守，自动采集→聚类→分析→推送 |
-| 💰 **人力节约** | 约 {ai_hours_saved} 小时/周 | AI替代人工分类聚类，每周节省约 {ai_hours_saved} 小时分析工时 |
-| 🛡️ **风险规避** | 自动识别 {risk_avoidance_value} 元潜在损失 | P0安全问题提前预警，避免事故赔偿与品牌损失 |
-| 🎯 **决策效率** | 分钟级响应 | 从数据采集到洞察输出仅需3分钟，传统方式需2小时 |
+| 💰 **人力节约** | 约 {ai_hours_saved} 小时/周 | AI替代人工分类聚类（估算系数：人工单条约12分钟），*大赛演示估算值* |
+| 🛡️ **风险规避** | 自动识别 {risk_avoidance_value} 元潜在损失 | P0安全问题提前预警，避免事故赔偿与品牌损失（*风险系数演示用*） |
+| 🎯 **决策效率** | 分钟级响应 | 从数据采集到洞察输出约3分钟，传统人工方式约2小时（*内部效率对比参考*） |
 
 > **核心价值主张：** 基于「飞书多维表格 + DeepSeek大模型 + 飞书AI问数」的交叉聚合架构，实现全渠道反馈的自动化洞察闭环，为自动驾驶安全运营提供实时风险预警与决策支持。
 
@@ -1486,11 +1491,11 @@ def build_report_header(record_count: int, bitable_url: str, stats: Optional[Dic
 
 | 指标 | 本期数值 | 上周基线 | 环比变化 | 状态 | 目标 | 达成率 | AI价值 |
 |------|---------|---------|---------|------|------|--------|--------|
-| 📥 **反馈总量** | {_fmt_val(total, ' 条')} | {last_week_total} 条 | {total_change} | {_fmt_status(total, 10, is_low=True)} | 周均 50 条 | {_fmt_progress(total, 50, is_low=True)} | AI自动汇聚5渠道 |
-| ✅ **闭环率** | {_fmt_val(close_rate, is_pct=True)} | {last_week_close_rate:.1f}% | {close_change} | {_fmt_status(close_rate, 95)} | ≥ 95% | {_fmt_progress(close_rate, 95)} | AI优先级自动分配 |
-| ⏱️ **平均处理时长** | {_fmt_val(avg_duration, ' 小时')} | {last_week_duration:.1f} 小时 | {duration_change} | {'—' if avg_duration == 0 else _fmt_status(24 / avg_duration, 1, 'lt')} | ≤ 24 小时 | {'—' if avg_duration == 0 else _fmt_progress(24 / avg_duration * 100, 100)} | AI智能路由加速 |
-| ⭐ **满意度评分** | {_fmt_val(avg_csat, ' / 5')} | {last_week_csat:.1f} / 5 | {csat_change} | {_fmt_status(avg_csat, 4.0)} | ≥ 4.0 | {_fmt_progress(avg_csat, 4.0)} | AI情感分析助力 |
-| 🔥 **高优先级占比** | {_fmt_val(high_pri_rate, is_pct=True)} | {last_week_high_pri:.1f}% | {high_pri_change} | {_fmt_status(20, high_pri_rate, 'lt')} | ≤ 20% | {_fmt_progress(20, max(high_pri_rate, 1))} | AI安全风险识别 |
+| 📥 **反馈总量** | {_fmt_val(total, ' 条')} | 📊 首期基线 | {total_change} | {_fmt_status(total, 10, is_low=True)} | 周均 50 条 | {_fmt_progress(total, 50, is_low=True)} | AI自动汇聚5渠道 |
+| ✅ **闭环率** | {_fmt_val(close_rate, is_pct=True)} | 📊 首期基线 | {close_change} | {_fmt_status(close_rate, 95)} | ≥ 95% | {_fmt_progress(close_rate, 95)} | AI优先级自动分配 |
+| ⏱️ **平均处理时长** | {_fmt_val(avg_duration, ' 小时')} | 📊 首期基线 | {duration_change} | {'—' if avg_duration == 0 else _fmt_status(24 / avg_duration, 1, 'lt')} | ≤ 24 小时 | {'—' if avg_duration == 0 else _fmt_progress(24 / avg_duration * 100, 100)} | AI智能路由加速 |
+| ⭐ **满意度评分** | {_fmt_val(avg_csat, ' / 5')} | 📊 首期基线 | {csat_change} | {_fmt_status(avg_csat, 4.0)} | ≥ 4.0 | {_fmt_progress(avg_csat, 4.0)} | AI情感分析助力 |
+| 🔥 **高优先级占比** | {_fmt_val(high_pri_rate, is_pct=True)} | 📊 首期基线 | {high_pri_change} | {_fmt_status(20, high_pri_rate, 'lt')} | ≤ 20% | {_fmt_progress(20, max(high_pri_rate, 1))} | AI安全风险识别 |
 
 ---
 
@@ -1609,56 +1614,57 @@ def _build_insight_action_section(
 {pending_section}
 ---
 
-### � Hand Off · 工作交接
+### 🤝 Hand Off · 工作交接
 
-> **本周关键交付与待跟进事项**
+> **本周关键交付与待跟进事项（基于本期 {total} 条工单的真实聚类结果）**
 
 #### ✅ 本周已完成
 
 | 事项 | 状态 | 负责人 | 说明 |
 |------|------|--------|------|
-| 🤖 周报自动生成与推送 | ✅ 已完成 | AI引擎 | 基于1710条工单数据自动聚类分析 |
-| 📊 可视化图表更新 | ✅ 已完成 | AI引擎 | 23张图表自动生成并插入文档 |
-| 🔔 异常告警检测 | ✅ 已完成 | AI引擎 | 无异常信号，运营状态平稳 |
-| 📋 P0工单闭环跟踪 | ✅ 进行中 | 研发团队 | 安全类问题持续跟进处理 |
+| 🤖 周报自动生成与推送 | ✅ 已完成 | AI引擎 | 基于本期 {total} 条工单 + {cat_count} 个分类自动聚类分析 |
+| 📊 可视化图表更新 | ✅ 已完成 | AI引擎 | 分类/优先级/渠道分布图 + TOP问题柱状图（图表数量随数据自动匹配） |
+| 🔔 异常告警检测 | ✅ 已完成 | AI引擎 | {"检测到"+str(len(alerts))+"项异常，建议优先处理" if alerts else "本周未检测到异常信号，运营状态平稳"} |
+| 📋 高优先级工单跟踪 | {"✅ 处理中" if pending_tickets else "✅ 已闭环"} | 研发/运营团队 | {"未闭环高优工单 "+str(len(pending_tickets))+" 条" if pending_tickets else "本期高优工单已全部闭环"} |
 
-#### 🔄 待跟进事项
+#### 🔄 待跟进事项（基于本期TOP问题动态生成）
 
 | 优先级 | 事项 | 负责人 | 截止时间 | 状态 |
 |--------|------|--------|---------|------|
-| 🔴 高优 | 斑马线急停感知策略优化 | 研发 | 本周内 | 排期中 |
-| 🟠 中优 | 定位漂移算法升级 | 研发 | 下周内 | 排期中 |
-| 🟠 中优 | ETA模型引入实时路况 | 产品 | 下下周 | 评审中 |
-| 🟡 低优 | 夜间提示音自动降噪 | 研发 | 待定 | 需求评审 |
+| 🔴 高优 | {top_cat}类问题专项优化（{top_cat_count}条反馈） | 研发/产品 | 本周内 | 排期中 |
+| 🟠 中优 | 处理时长优化（当前均值 {stats.get('avg_duration_hours', 0):.1f} 小时） | 运营 | 下周内 | 排期中 |
+| 🟠 中优 | 闭环率提升（当前 {stats.get('close_rate', 0):.1f}%，目标 ≥95%） | 运营 | 下周内 | 跟进中 |
+| 🟡 低优 | closed_at / csat_score 等关键字段采集完善 | 数据团队 | 待定 | 需求梳理 |
 
-#### ⚠️ 需要升级的问题
+#### ⚠️ 需要升级的问题（动态判断）
 
 | 问题 | 当前状态 | 升级原因 | 建议措施 |
 |------|---------|---------|---------|
-| P0安全问题持续存在 | 处理中 | 涉及行人安全，风险等级高 | 建议召开专项会议，加速处理 |
-| 闭环率未达标（92.5%） | 关注中 | 距离目标95%仍有差距 | 优化流程，提升处理效率 |
+| {"安全类（P0）问题存在" if stats.get("high_priority_rate",0)>=5 else "暂无P0安全告警"} | {"处理中" if stats.get("high_priority_rate",0)>=5 else "—"} | {"涉及行人和车辆安全风险，等级高" if stats.get("high_priority_rate",0)>=5 else "—"} | {"建议专项复盘，评估是否需策略热修" if stats.get("high_priority_rate",0)>=5 else "无需升级，常规监控即可"} |
+| {"闭环率未达目标" if stats.get("close_rate",0) < 95 else "闭环率达标"} | {"关注中" if stats.get("close_rate",0) < 95 else "✅ 正常"} | {"当前 "+str(round(stats.get('close_rate',0),1))+"%，距目标 95% 差 "+str(round(95-stats.get('close_rate',0),1))+"pp" if stats.get("close_rate",0) < 95 else "—"} | {"优化分派规则，缩短 P2/P3 在途时长" if stats.get("close_rate",0) < 95 else "—"} |
 
 #### 🎯 下周重点关注
 
-- 🛡️ **安全风控**：持续监控P0/P1问题，确保零事故
-- ⚡ **效率提升**：推进处理时长优化，目标≤24小时
-- 📊 **数据质量**：完善closed_at等关键字段采集
+- 🛡️ **安全风控**：持续监控 P0/P1 安全类问题，确保响应 SLA 达标
+- ⚡ **效率提升**：推进平均处理时长优化，目标 ≤ 24 小时
+- 📊 **数据质量**：完善 closed_at、csat_score、assigned_to 等关键字段采集闭环率
+- 💬 **用户回访**：针对 P2 以上未回访工单开展满意度调研
 
 ---
 
 ### 📈 改进迭代对比
 
-> **数据驱动闭环：本期改进项 → 预期下期效果**
+> **数据驱动闭环：本期聚类TOP问题 → 预期下期优化效果**
 >
-> *基于内部500条标注样本实测结论*
+> *下述改进项由 DeepSeek 基于本期 {total} 条工单聚类结果生成，验证指标为预期目标*
 
 | 改进项 | 本期状态 | 预期下期效果 | 验证指标 |
 |--------|---------|------------|----------|
-| 🔴 斑马线急停感知策略优化 | 研发排期中 | 急停风险消除 | 安全类反馈下降至0 |
-| 🟠 定位漂移算法升级 | 研发排期中 | 定位精度提升80% | 定位异常率<1% |
-| 🟠 夜间提示音自动降噪 | 研发排期中 | 小区投诉归零 | 夜间扰民投诉下降90% |
-| 🟠 ETA模型引入实时路况 | 产品评审中 | 超时率降低50% | 晚点用户占比<5% |
-| 🟡 取件通知触发时机调整 | 运营优化中 | 用户体验提升 | 取件等待时长缩短30% |
+| 🔴 TOP1「{top_cat}」问题专项治理 | 研发排期中 | 同类问题显著收敛 | {top_cat}类反馈环比下降 50% |
+| 🟠 处理时长优化专项 | 运营跟进中 | P2以上处理时长达标率提升 | 平均处理时长 ≤ 24h 达标率 ≥ 90% |
+| 🟠 分派规则优化（自动匹配负责人） | 产品评审中 | 人工分派耗时归零 | 分派命中率 ≥ 85% |
+| � 用户回访流程标准化 | 运营优化中 | 满意度样本量提升 | csat_score 填写率 ≥ 60% |
+| 🟡 关键字段采集完整性治理 | 数据团队推进中 | 减少「—」空值占比 | closed_at/assigned_to 回填率 ≥ 90% |
 
 ---
 
@@ -1666,15 +1672,15 @@ def _build_insight_action_section(
 
 #### 🤖 AI架构创新对比
 
-| 维度 | 人工方式 | DeepSeek自动聚类 | 飞书AI问数 |
+| 维度 | 人工方式（参考值） | DeepSeek自动聚类 | 飞书AI问数 |
 |------|---------|-----------------|-----------|
-| ⏱️ **响应速度** | 2-4小时/周 | 3分钟/周 | 秒级响应 |
-| 🎯 **分类准确率** | 约75%（易遗漏） | **95%+**（语义理解） | **98%+**（交互式验证） |
-| 📊 **洞察深度** | 表面统计 | 根因推断+趋势预测 | 自由下钻+关联分析 |
+| ⏱️ **响应速度** | 2-4小时/周（*人工参考*） | 约3分钟/周（*实测耗时*） | 秒级响应 |
+| 🎯 **分类准确率** | 约70-75%（*人工易受疲劳影响*） | **85-95%**（*语义理解，大赛演示指标*） | **95%+**（*交互式人工验证，大赛演示指标*） |
+| 📊 **洞察深度** | 表面统计为主 | 根因推断+趋势预测 | 自由下钻+关联分析 |
 | 🔄 **自动化程度** | 手动操作 | 100%自动 | 按需触发 |
-| 💰 **人力成本** | 5人/周 | 0人/周 | 辅助决策 |
+| 💰 **人力成本** | 多人协同/周 | 0人/周（仅需审核） | 辅助决策 |
 
-> *基于内部500条标注样本实测结论*
+> *量化指标来源：人工处理效率参照行业客服工单运营均值；AI侧基于 DeepSeek + 飞书 AI 问数在本期 {total} 条工单上的处理表现，大赛场景仅供参考。*
 
 #### 🔧 核心能力模块
 
@@ -1707,17 +1713,17 @@ def _build_insight_action_section(
 
 ### 💼 商业价值与产业刚需
 
-> **自动驾驶安全风控是产业刚需，本方案提供完整解决方案：**
+> **自动驾驶安全风控是产业刚需，本方案提供完整解决方案框架：**
+>
+> *以下量化指标为大赛场景的估算参考，实际收益需以落地运营数据为准*
 
-| 价值维度 | 量化指标 | 商业影响 |
+| 价值维度 | 量化指标（大赛参考） | 商业影响解读 |
 |----------|---------|---------|
-| 🛡️ **安全风险预警** | P0问题识别率95%+ | 避免交通事故，减少赔偿损失 |
-| ⚡ **运营效率提升** | 分析效率提升40倍 | 从2小时→3分钟，释放人力成本 |
-| 📈 **决策质量提升** | AI辅助决策准确率85%+ | 数据驱动决策，减少人为误判 |
-| 🤝 **用户体验优化** | 响应速度提升90% | 用户满意度提升，品牌口碑改善 |
-| 💰 **成本节约** | 年度人力成本节约50万+ | 替代3-5人数据分析团队 |
-
-> *基于内部500条标注样本实测结论*
+| 🛡️ **安全风险预警** | P0问题识别率约 85-95% | 提前发现安全隐患，减少事故赔偿与品牌声誉损失 |
+| ⚡ **运营效率提升** | 单周分析耗时从人工 2h → AI 约 3min | 释放运营团队时间，聚焦问题处置而非统计整理 |
+| 📈 **决策质量提升** | 问题归因+趋势自动输出 | 数据驱动决策，减少经验型误判 |
+| 🤝 **用户体验优化** | 分类/分级 + SLA 自动分派 | 用户诉求更快到对的人，缩短整体响应链路 |
+| 💰 **成本节约参考** | 年度人力节约估算 20-50 万区间 | 按 3-5 人分析团队 · 年均人工成本匡算（*参考区间*） |
 
 > **核心商业价值：** 在自动驾驶商业化进程中，安全是生命线。本方案通过AI驱动的实时风险预警体系，将安全隐患消除在萌芽状态，为无人配送规模化运营保驾护航。
 
@@ -1725,11 +1731,11 @@ def _build_insight_action_section(
 
 ## 📝 参赛答辩摘要（300字以内）
 
-> **核心创新：** 基于「飞书多维表格 + DeepSeek大模型 + 飞书AI问数」交叉聚合架构，实现全渠道用户反馈的自动化洞察闭环。AI自动化率100%，每周节约约342小时人工分析工时，决策效率提升40倍。
+> **核心创新：** 基于「飞书多维表格 + DeepSeek大模型 + 飞书AI问数」交叉聚合架构，实现全渠道用户反馈的自动化洞察闭环。本期处理 **{total}** 条工单，AI自动聚类覆盖 **{cat_count}** 个分类，聚类步骤全自动完成。
 >
-> **落地收益：** 系统上线后，闭环率从85%提升至92.4%，处理时长从28小时降至17.1小时，P0安全问题识别率95%+，有效规避事故赔偿与品牌损失。
+> **落地收益（本期数据）：** 本期闭环率 **{stats.get('close_rate', 0):.1f}%**，平均处理时长 **{stats.get('avg_duration_hours', 0):.1f} 小时**，高优先级占比 **{stats.get('high_priority_rate', 0):.1f}%**，TOP1问题类别为「{top_cat}」（{top_cat_count}条）。
 >
-> **复用价值：** 基于飞书生态的低代码架构，可快速复用至外卖、零售、医疗等行业，配置工作量仅需2小时，具备SaaS化推广潜力。
+> **复用价值：** 基于飞书生态的低代码架构，可快速复用至外卖、零售、医疗等行业，仅需调整分类标签即可完成适配，配置工作量约 2 小时，具备 SaaS 化推广潜力。
 
 *本报表由 AI 自动生成 · 数据来源于飞书多维表格全渠道工单池 · {datetime.now().strftime('%Y-%m-%d %H:%M')}*
 """
@@ -1816,12 +1822,240 @@ def build_feedback_text(records: List[Dict[str, Any]], max_records: int = 30) ->
 # 主流程
 # ============================================================
 
+# ============================================================
+# P2 周报环比：snapshot 保存 & 对比上周（聚类结果可视化闭环）
+# ============================================================
+SNAPSHOT_PREFIX = "weekly_snapshot_"
+SNAPSHOT_GLOB = f"{SNAPSHOT_PREFIX}*.json"
+
+
+def _build_cat_pri_matrix(records: List[Dict[str, Any]]) -> Dict[str, Dict[str, int]]:
+    """构建 category × priority 交叉计数矩阵（用于环比趋势矩阵表格）。
+
+    Returns:
+        {cat中文: {P0: N, P1: N, P2: N, P3: N}}，外层key顺序=安全/故障/体验/投诉/建议
+    """
+    from collections import defaultdict
+
+    cats_order = ["安全", "故障", "体验", "投诉", "建议"]
+    pris = ["P0", "P1", "P2", "P3"]
+    matrix: Dict[str, Dict[str, int]] = {c: {p: 0 for p in pris} for c in cats_order}
+
+    for r in records:
+        fields = r.get("fields", {})
+        # category 标准化（中文兼容）
+        cat_raw = str(fields.get("category") or "").strip()
+        if cat_raw in _CHANNEL_COMPAT.values():
+            pass  # 英文渠道值不影响 category
+        # 反向兼容：如果是英文 Schema 值，就当未分类处理（不统计到矩阵里，保持与原逻辑一致）
+        if cat_raw not in cats_order:
+            # 尝试按已知中文映射（飞书端存的就是中文，一般会命中）；未知值跳过不统计
+            continue
+        # priority 标准化（只认 P0-P3，非法兜底 P2 与原逻辑一致）
+        pri_raw = str(fields.get("priority") or "").strip()
+        pri = pri_raw if pri_raw in pris else _PRIORITY_COMPAT_DEFAULT
+        matrix[cat_raw][pri] += 1
+
+    return matrix
+
+
+def _save_weekly_snapshot(
+    output_dir: Path,
+    stats: Dict[str, Any],
+    cat_pri_matrix: Dict[str, Dict[str, int]],
+    date_str: str,
+) -> Path:
+    """保存本周结构化 snapshot JSON（不含任何 PII，仅存聚合统计值）。
+
+    文件名：weekly_snapshot_YYYYMMDD.json
+    """
+    snapshot = {
+        "date": date_str,
+        "total_N": stats.get("total", 0),
+        # category 分布（Counter 转普通 dict）
+        "category_dist": {
+            str(k): int(v) for k, v in (stats.get("categories") or {}).items()
+        },
+        # priority 分布
+        "priority_dist": {
+            str(k): int(v) for k, v in (stats.get("priorities") or {}).items()
+        },
+        # category × priority 交叉矩阵（环比趋势矩阵的数据源）
+        "cat_pri_matrix": {
+            cat: {pri: int(cnt) for pri, cnt in pris.items()}
+            for cat, pris in cat_pri_matrix.items()
+        },
+        # TOP 问题（取 category 前 3 名）
+        "top_issues": [
+            {"issue": str(k), "count": int(v)}
+            for k, v in sorted(
+                (stats.get("categories") or {}).items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )[:3]
+        ],
+    }
+    file_path = output_dir / f"{SNAPSHOT_PREFIX}{date_str}.json"
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(snapshot, f, ensure_ascii=False, indent=2)
+    return file_path
+
+
+def _find_last_snapshot(output_dir: Path, this_date: str, compare_with: Optional[str]) -> Optional[Dict[str, Any]]:
+    """找上周 snapshot JSON：优先 --compare-with 指定日期，否则自动找最近一个≠本周的。
+
+    Returns:
+        snapshot dict，找不到返回 None
+    """
+    import glob
+
+    pattern = str(output_dir / SNAPSHOT_GLOB)
+    candidates = sorted(glob.glob(pattern))
+
+    if not candidates:
+        return None
+
+    # 如果用户指定了 --compare-with YYYYMMDD，就精准找这个
+    if compare_with:
+        target_name = f"{SNAPSHOT_PREFIX}{compare_with}.json"
+        for p in candidates:
+            if os.path.basename(p) == target_name:
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        print(f"⚠️  --compare-with={compare_with} 未找到对应 snapshot，跳过环比")
+        return None
+
+    # 否则自动找：文件名日期最大 且 ≠ this_date 的那一个
+    parsed = []
+    for p in candidates:
+        base = os.path.basename(p)
+        # weekly_snapshot_YYYYMMDD.json → 取中间 YYYYMMDD
+        try:
+            d = base[len(SNAPSHOT_PREFIX):-len(".json")]
+            if len(d) == 8 and d.isdigit():
+                parsed.append((d, p))
+        except Exception:
+            continue
+    parsed.sort(key=lambda x: x[0], reverse=True)
+    for d, p in parsed:
+        if d != this_date:
+            with open(p, "r", encoding="utf-8") as f:
+                snap = json.load(f)
+            snap["_source_file"] = p
+            return snap
+    return None
+
+
+def _fmt_pp(v: float) -> str:
+    """格式化 pp 变化量：正数绿↑+，负数红↓-，0 持平"""
+    if abs(v) < 0.05:
+        return "➡️ ±0pp"
+    if v > 0:
+        return f"📈 +{v:.1f}pp"
+    return f"📉 {v:.1f}pp"
+
+
+def _build_compare_matrix_md(
+    this_snap: Dict[str, Any],
+    last_snap: Optional[Dict[str, Any]],
+) -> str:
+    """生成「📈 本周 vs 上周 环比趋势矩阵」Markdown 表格 + 关键解读。
+
+    last_snap 为 None 时：只显示本周占比，显示说明「下期自动生效」。
+    """
+    cats_order = ["安全", "故障", "体验", "投诉", "建议"]
+    pris = ["P0", "P1", "P2", "P3"]
+
+    this_total = max(int(this_snap.get("total_N", 0)), 1)
+    this_matrix = this_snap.get("cat_pri_matrix") or {}
+    # 补全缺省 key，防止上周 snapshot 格式旧版缺字段时报错
+    for c in cats_order:
+        this_matrix.setdefault(c, {p: 0 for p in pris})
+        for p in pris:
+            this_matrix[c].setdefault(p, 0)
+
+    if last_snap:
+        last_total = max(int(last_snap.get("total_N", 0)), 1)
+        last_matrix = last_snap.get("cat_pri_matrix") or {}
+        last_date = last_snap.get("date", "上期")
+        for c in cats_order:
+            last_matrix.setdefault(c, {p: 0 for p in pris})
+            for p in pris:
+                last_matrix[c].setdefault(p, 0)
+    else:
+        last_total = 0
+        last_matrix = None
+        last_date = None
+
+    # 表头：分类 \ P0 | P1 | P2 | P3
+    header = "| 分类 / 优先级 | P0 | P1 | P2 | P3 |"
+    sep    = "|---------------|----|----|----|----|"
+    rows: List[str] = []
+
+    # 收集最大变化量 cell（用于关键解读）
+    max_delta: float = 0.0
+    max_delta_desc = ""
+
+    for cat in cats_order:
+        cells = [f"**{cat}**"]
+        for p in pris:
+            this_cnt = int(this_matrix[cat].get(p, 0))
+            this_pct = this_cnt / this_total * 100
+            if last_matrix is not None:
+                last_cnt = int(last_matrix.get(cat, {}).get(p, 0))
+                # 上周总数归一化，显示上周占比
+                last_pct = last_cnt / last_total * 100
+                delta_pp = this_pct - last_pct
+                cell = f"{this_pct:.1f}%<br>({last_pct:.1f}%)<br>{_fmt_pp(delta_pp)}"
+                if abs(delta_pp) > abs(max_delta):
+                    max_delta = delta_pp
+                    trend = "上升" if delta_pp > 0 else "下降"
+                    max_delta_desc = f"{cat}类 P{priority_display(p)}占比{trend} {abs(delta_pp):.1f}pp"
+            else:
+                # 首期模式：如果该格子数量=0就简洁显示「—」，否则显示占比+首期基线
+                if this_cnt == 0:
+                    cell = "—"
+                else:
+                    cell = f"{this_pct:.1f}%<br>（首期基线）"
+            cells.append(cell)  # ⚠️ 修复：原来漏了 append！4 个优先级列永远空
+        rows.append("| " + " | ".join(cells) + " |")
+
+    # 关键解读
+    if last_snap is not None:
+        delta_total = this_snap.get("total_N", 0) - last_snap.get("total_N", 0)
+        delta_total_pct = (delta_total / max(last_snap.get("total_N", 1), 1)) * 100
+        total_delta_desc = f"反馈总量：{last_snap.get('total_N',0)}→{this_snap.get('total_N',0)}（{'+' if delta_total>=0 else ''}{delta_total}，{'+' if delta_total_pct>=0 else ''}{delta_total_pct:.1f}%）"
+        insight = max_delta_desc if max_delta_desc else "各类别占比整体持平"
+        note_line = f"**📌 关键解读：** {total_delta_desc}；{insight}。"
+    else:
+        note_line = "**📌 说明：** 首期周报无上期基线对比，本周数据作为环比基准，**下周自动生效**。"
+
+    title = "## 📈 本周 vs 上周 环比趋势矩阵\n\n"
+    if last_date:
+        title += f"> 对比周期：本期 {this_snap.get('date', '')} vs 上期 {last_date}\n\n"
+    else:
+        title += "> 对比周期：本期（首期基线，下周自动环比）\n\n"
+
+    table_md = "\n".join([header, sep] + rows)
+    return f"{title}{table_md}\n\n{note_line}\n\n---\n\n"
+
+
+def priority_display(pri_code: str) -> str:
+    """优先级简短展示（用于环比解读文本）"""
+    mapping = {"P0": "0级", "P1": "1级", "P2": "2级", "P3": "3级"}
+    return mapping.get(pri_code, pri_code)
+
+
 def main() -> None:
     print("📊 无人配送反馈周报（交叉聚合版）")
     print("=" * 50)
 
     parser = argparse.ArgumentParser(description="无人配送反馈聚类周报生成")
     parser.add_argument("--offline", action="store_true", help="离线模式：从本地 CSV 读取数据")
+    parser.add_argument("--compare-with", type=str, default="",
+                        help="手动指定对比上周快照日期 YYYYMMDD（默认自动找最近一期）")
+    parser.add_argument("--no-snapshot", action="store_true",
+                        help="不保存本周 snapshot JSON（默认保存）")
     args = parser.parse_args()
 
     # 项目根目录
@@ -1885,15 +2119,54 @@ def main() -> None:
         return
 
     # ============================================================
+    # P2 周报环比：构建 snapshot + 找上周基线（在报告最开头插入环比矩阵）
+    # ============================================================
+    today_str = datetime.now().strftime("%Y%m%d")
+    print("📈 环比：正在计算 category×priority 交叉矩阵...")
+    cat_pri_matrix = _build_cat_pri_matrix(records)
+    stats = compute_statistics(records)
+
+    # 内存版 this_snap（用于环比矩阵渲染；是否落盘由 --no-snapshot 控制）
+    this_snap = {
+        "date": today_str,
+        "total_N": stats.get("total", 0),
+        "category_dist": {str(k): int(v) for k, v in (stats.get("categories") or {}).items()},
+        "priority_dist": {str(k): int(v) for k, v in (stats.get("priorities") or {}).items()},
+        "cat_pri_matrix": {
+            cat_name: {pri_name: int(pri_cnt) for pri_name, pri_cnt in pri_dict.items()}
+            for cat_name, pri_dict in cat_pri_matrix.items()
+        },
+        "top_issues": [
+            {"issue": str(k), "count": int(v)}
+            for k, v in sorted(
+                (stats.get("categories") or {}).items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )[:3]
+        ],
+    }
+
+    # 找上周 snapshot（用户指定 --compare-with 或自动找最近一期≠今天）
+    compare_target = args.compare_with.strip() or None
+    last_snap = _find_last_snapshot(output_dir, today_str, compare_target)
+    if last_snap:
+        src = last_snap.pop("_source_file", "")
+        print(f"📈 环比：找到上期基线 {last_snap.get('date', '?')}（{src or 'compare-with指定'}）")
+    else:
+        print(f"📈 环比：未找到上期 snapshot（首期基线，下周自动环比）")
+
+    compare_md = _build_compare_matrix_md(this_snap, last_snap)
+
+    # ============================================================
     # 组装周报
     # ============================================================
 
     print("📝 正在生成报告...")
 
-    # 先计算统计数据（用于 AI 导读和图表）
-    stats = compute_statistics(records)
-
+    # 报告结构：大赛摘要 → 环比矩阵（P2新增，答辩亮眼卖点） → DeepSeek聚类 → 洞察行动
     report_content = build_report_header(len(records), bitable_url, stats)
+    # 【P2新增】环比矩阵插在最开头（紧跟 KPI 概览之后），评委第一眼看到数据闭环
+    report_content += compare_md
 
     if use_deepseek:
         api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -1933,10 +2206,19 @@ def main() -> None:
     # 保存文件
     # ============================================================
 
-    output_file = output_dir / f"weekly_report_{datetime.now().strftime('%Y%m%d')}.md"
+    output_file = output_dir / f"weekly_report_{today_str}.md"
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(report_content)
     print(f"✅ 报告已保存到本地：{output_file}")
+
+    # ============================================================
+    # P2 周报环比：保存本周 snapshot JSON（供下周自动对比）
+    # ============================================================
+    if not args.no_snapshot:
+        snap_path = _save_weekly_snapshot(output_dir, stats, cat_pri_matrix, today_str)
+        print(f"✅ 本周快照已保存（下周自动环比）：{snap_path}")
+    else:
+        print("ℹ️  --no-snapshot 已启用，跳过保存本周快照")
 
     # ============================================================
     # 上传到飞书云文档（在线模式）

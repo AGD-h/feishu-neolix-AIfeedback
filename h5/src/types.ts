@@ -1,6 +1,26 @@
 export type FeedbackCategory = '安全' | '故障' | '体验' | '投诉' | '建议';
 export type FeedbackPriority = 'P0' | 'P1' | 'P2' | 'P3';
-export type FeedbackChannel = '车身扫码' | '客服电话' | '微信群' | '社媒舆情' | '滴滴评价' | '车端告警' | '人工录入';
+
+/**
+ * 工单渠道枚举（唯一 SSOT = AGENTS.md Schema 英文值）
+ * 此类型贯穿前后端，写入飞书多维表格时直接用，无需再做中文→英文转换
+ */
+export type FeedbackChannel =
+  | 'scan_qr'        // 车身扫码
+  | 'hotline'        // 客服电话
+  | 'wechat_group'   // 微信群
+  | 'didi_review'    // 滴滴评价
+  | 'social_media'   // 社媒舆情
+  | 'telemetry'      // 车端告警
+  | 'manual';        // 人工录入
+
+/**
+ * contact_allowed 的合法值（Schema 单选枚举，必须是字符串，严禁 boolean）
+ * - '' 空串 = 用户未表态（checkbox 未勾选时写入）
+ * - '是' = 允许工作人员联系
+ * - '否' = 不希望被打扰
+ */
+export type ContactAllowed = '是' | '否' | '';
 
 export interface FeedbackSubmitData {
   vehicle_id: string;
@@ -8,9 +28,10 @@ export interface FeedbackSubmitData {
   category?: FeedbackCategory;
   contact_name?: string;
   contact_phone?: string;
-  contact_allowed?: boolean;
+  /** 联系意愿，必须是字符串三态，传 boolean 会在编译期报错 */
+  contact_allowed?: ContactAllowed;
   location_detail?: string;
-  city?: string;             // 从二维码 payload 透传的城市（问题4同修）
+  city?: string;             // 从二维码 payload 透传的城市
   user_tier_hint?: string;   // 前端能识别时传（如扫码是收件人），不传兜底路人社区
 }
 
@@ -34,11 +55,21 @@ export interface QRCodeData {
 
 // ======================================================
 // 工单枚举映射表（唯一 SSOT：AGENTS.md 工单 Schema）
-// 所有前后端写入飞书的枚举值必须经此表转换，保证中/英文一致
 // ======================================================
 
-/** 渠道枚举映射：前端中文展示 → AGENTS.md Schema 英文值（写入多维表格） */
-export const CHANNEL_MAP: Record<FeedbackChannel, string> = {
+/** 渠道英文枚举 → 前端中文展示标签 */
+export const CHANNEL_LABEL: Record<FeedbackChannel, string> = {
+  scan_qr: '车身扫码',
+  hotline: '客服电话',
+  wechat_group: '微信群',
+  didi_review: '滴滴评价',
+  social_media: '社媒舆情',
+  telemetry: '车端告警',
+  manual: '人工录入',
+};
+
+/** （兼容旧代码保留）中文展示名 → Schema 英文值，新代码请直接用 FeedbackChannel 英文枚举 */
+export const CHANNEL_MAP: Record<string, FeedbackChannel> = {
   '车身扫码': 'scan_qr',
   '客服电话': 'hotline',
   '微信群':  'wechat_group',
