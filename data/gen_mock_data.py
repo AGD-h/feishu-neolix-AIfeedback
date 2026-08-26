@@ -9,7 +9,21 @@
 import csv
 import os
 import random
+import sys
 from datetime import datetime, timedelta
+
+# ============================================================
+# ★ 工单 Schema 常量：统一从根目录 schema_constants.py 引用
+# ============================================================
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+from schema_constants import (
+    WORKORDER_SCHEMA_FIELDS,  # 18 字段标准顺序（CSV 列头强制按此输出，不靠 dict 插入顺序）
+    VALID_CHANNELS,           # 7 英文 channel 枚举（随机生成时校验）
+    VALID_PRIORITIES,         # P0/P1/P2/P3
+)
 
 # ============ 配置区（想调整就改这里） ============
 TOTAL = 800                # 生成条数（500–1000 之间）
@@ -28,6 +42,14 @@ USER_TIER_WEIGHTS = {
 
 CITIES = ["北京", "石家庄", "青岛", "苏州", "无锡", "天水", "深圳", "杭州", "成都", "武汉"]
 NAMES = ["张伟", "李娜", "王强", "刘敏", "陈杰", "赵磊"]  # assigned_to 演示用
+CONTACT_NAMES = ["孙先生", "周女士", "吴师傅", "郑经理", "冯阿姨", "钱先生", "朱女士", "马老板"]  # 联系人姓名池
+# 位置详情模板（按城市+场景构造，更真实）
+LOCATION_TEMPLATES = [
+    "{city}朝阳小区3号楼东门", "{city}万达广场B1快递柜旁", "{city}科技园南门斑马线",
+    "{city}幸福里小区西门", "{city}地铁2号线C出口", "{city}大学北门学生宿舍区",
+    "{city}中心医院门诊部门口", "{city}生鲜超市收货区", "{city}驿站站点门口",
+    "{city}幼儿园门口接送区", "{city}写字楼大堂快递点", "{city}美食街路口",
+]
 
 # ============ 反馈内容模板 ============
 # 结构：(user_tier, category, priority, 原声模板列表)
@@ -157,7 +179,8 @@ def main():
         created = random_time_in_days(DAYS)
         datekey = created.strftime("%Y%m%d")
         date_counters[datekey] = date_counters.get(datekey, 0) + 1
-        fid = f"FB-{datekey}-{date_counters[datekey]:04d}"
+        # 按约定：仿真Mock数据用 M 前缀（舆情S / H5扫码H / 仿真M）
+        fid = f"FB-{datekey}-M{date_counters[datekey]:04d}"
 
         # 大部分历史工单已闭环（有 closed_at 和评分），近 3 天的多数还在处理中
         is_recent = (datetime.now() - created).days < 3
@@ -171,6 +194,17 @@ def main():
             closed_at = closed.strftime("%Y-%m-%d %H:%M")
             csat = random.choices([5, 4, 3, 2, 1], weights=[35, 35, 18, 8, 4], k=1)[0]
 
+        # ========== 补充 4 个新增字段（严格按 Schema 顺序放在 csat_score 后） ==========
+        # contact_name：约50%概率有姓名，其余为空
+        contact_name = random.choice(CONTACT_NAMES) if random.random() < 0.5 else ""
+        # contact_phone：约40%概率有手机号（13x开头的11位），其余为空
+        contact_phone = ("13" + "".join(str(random.randint(0, 9)) for _ in range(9))) if random.random() < 0.4 else ""
+        # contact_allowed：40%是/30%否/30%空
+        contact_allowed = random.choices(["是", "否", ""], weights=[40, 30, 30], k=1)[0]
+        # location_detail：约60%概率填入具体位置，用城市模板构造
+        city_val = random.choice(CITIES)
+        location_detail = random.choice(LOCATION_TEMPLATES).format(city=city_val) if random.random() < 0.6 else ""
+
         rows.append({
             "feedback_id": fid,
             "channel": random.choice(TIER_CHANNEL[tier]),
@@ -179,20 +213,25 @@ def main():
             "priority": pri,
             "status": status,
             "vehicle_id": f"NX-{random.choice(['BJ','SJZ','QD','SZ','TS'])}-{random.randint(1, 500):04d}",
-            "city": random.choice(CITIES),
+            "city": city_val,
             "content_raw": content,
             "content_summary": make_summary(content, cat),
             "created_at": created.strftime("%Y-%m-%d %H:%M"),
             "closed_at": closed_at,
             "assigned_to": random.choice(NAMES),
             "csat_score": csat,
+            "contact_name": contact_name,
+            "contact_phone": contact_phone,
+            "contact_allowed": contact_allowed,
+            "location_detail": location_detail,
         })
 
     # 按时间排序后写 CSV（utf-8-sig 带 BOM，Excel 直接打开不乱码）
     rows.sort(key=lambda r: r["created_at"])
     csv_path = os.path.join(OUT_DIR, "mock_feedback.csv")
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        # ★ 强制用 WORKORDER_SCHEMA_FIELDS 作为列头（不依赖 dict.keys() 插入顺序，跨 Python 版本稳定）
+        writer = csv.DictWriter(f, fieldnames=WORKORDER_SCHEMA_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 

@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ==================== H5 前端构建检查 ====================
+  h5-build:
+    name: H5 Frontend Build & Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./h5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './h5/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: h5-dist
+          path: ./h5/dist/
+          retention-days: 7
+
+  # ==================== Python 语法检查 ====================
+  python-check:
+    name: Python Syntax Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check Python syntax (root + scripts + report + data)
+        run: |
+          set -euo pipefail
+          # 用 -print0 + read -d '' 兼容含空格/特殊字符的文件名（虽然本项目不会有，但CI保持通用规范）
+          find . -name "*.py" \
+            -not -path "./.git/*" \
+            -not -path "./.agents/*" \
+            -not -path "./.junie/*" \
+            -not -path "./.qoder/*" \
+            -not -path "./.trae/*" \
+            -not -path "./h5/node_modules/*" \
+            -print0 | while IFS= read -r -d '' f; do
+              echo "Checking $f"
+              python -m py_compile "$f"
+            done
+          echo "All Python files passed syntax check"

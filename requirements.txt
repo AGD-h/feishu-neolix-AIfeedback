@@ -1,4 +1,8 @@
-requests>=2.32
-python-dotenv>=1.0
-openai>=1.40
-pandas>=2.2
+# 依赖版本锁定区间：大版本禁止自动升级，避免 breaking change
+# 如需升级主版本，请手动改版本号并本地完整测试通过后再修改
+requests>=2.31,<3
+python-dotenv>=1.0,<2
+openai>=1.30,<2
+pandas>=2.2,<3
+matplotlib>=3.9,<4
+numpy>=2.0,<3
